@@ -70,7 +70,7 @@ if __name__ == "__main__":
     backtest = BacktestSystem(account, password)
 
     # 讓使用者輸入策略名稱
-    strategy_name = "Test BOT"
+    strategy_name = "RL Model v2"
 
     # 設定回測期間
     start_date = "20250220"
