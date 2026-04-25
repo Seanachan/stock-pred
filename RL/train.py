@@ -1,13 +1,14 @@
 import os
 
+import gymnasium as gym
 import pandas as pd
 import torch
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 from torch import nn
 
+import RL.env  # noqa: F401
 from RL.constant import stock_ids, train_end, train_start
-from RL.env import TradingEnv
 
 
 def train_agent(env: DummyVecEnv, total_timesteps: int = 100000):
@@ -39,6 +40,7 @@ def train_agent(env: DummyVecEnv, total_timesteps: int = 100000):
     env.reset()
     print("Starting training...")
     model.learn(total_timesteps=total_timesteps)
+    env.render()
 
     model.save("ppo_trading_agent_v1")
     print("Training completed.")
@@ -63,7 +65,11 @@ def load_data(data_dir: str = f"{os.getcwd()}/RL/data/") -> dict:
     return historical_dfs
 
 
+def make_env(stock_data):
+    return lambda: gym.make("TradingEnv-v0", stock_ids=stock_ids, stock_data=stock_data)
+
+
 if __name__ == "__main__":
     stock_data = load_data()
-    env = DummyVecEnv([lambda: TradingEnv(stock_ids=stock_ids, stock_data=stock_data)])
+    env = DummyVecEnv([make_env(stock_data)])
     train_agent(env=env)

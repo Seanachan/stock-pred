@@ -1,12 +1,14 @@
 import os
+from typing import Any
 
+import gymnasium as gym
 import pandas as pd
 import torch
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from RL.constant import stock_ids, val_end, val_start, test_end, test_start
-from RL.env import TradingEnv
+import RL.env  # noqa: F401
+from RL.constant import stock_ids, val_end, val_start
 
 
 def val_agent(env: DummyVecEnv, total_timesteps: int = 100000):
@@ -19,7 +21,7 @@ def val_agent(env: DummyVecEnv, total_timesteps: int = 100000):
     )
     # Evaluate the agent
     print("Starting evaluation...")
-    obs = env.reset()
+    obs: Any = env.reset()
     actions_log = []
     done = False
     final = {}
@@ -50,7 +52,7 @@ def load_data(data_dir: str = f"{os.getcwd()}/RL/data/") -> dict:
             df = df[~df.index.duplicated(keep="last")]
             df = df.sort_index()
 
-            historical_dfs[stock_id] = df.loc[test_start:test_end].dropna()
+            historical_dfs[stock_id] = df.loc[val_start:val_end].dropna()
             print(
                 f"Successfully load {stock_id}.csv, data length = {len(historical_dfs[stock_id])}"
             )
@@ -59,7 +61,11 @@ def load_data(data_dir: str = f"{os.getcwd()}/RL/data/") -> dict:
     return historical_dfs
 
 
+def make_env(stock_data):
+    return lambda: gym.make("TradingEnv-v0", stock_ids=stock_ids, stock_data=stock_data)
+
+
 if __name__ == "__main__":
     stock_data = load_data()
-    env = DummyVecEnv([lambda: TradingEnv(stock_ids=stock_ids, stock_data=stock_data)])
+    env = DummyVecEnv([make_env(stock_data)])
     val_agent(env=env)

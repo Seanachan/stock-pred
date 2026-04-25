@@ -213,3 +213,4 @@ RL/data/fetch.log
 
 # Trained Model
 *.zip
+img/

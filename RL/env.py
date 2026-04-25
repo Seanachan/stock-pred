@@ -19,13 +19,14 @@ register(
 
 
 class TradingEnv(gym.Env):
-    metadata = {"render.modes": ["human"], "render_fps": 1}
+    metadata = {"render_modes": ["human"], "render_fps": 1}
 
     def __init__(
         self,
         stock_ids=stock_ids,
         stock_data=None,
         backtest_system=None,
+        render_mode=None,
     ):
         super(TradingEnv, self).__init__()
 
@@ -44,6 +45,7 @@ class TradingEnv(gym.Env):
         self.asset_history = [self.initial_cash]
         self.stock_ids = stock_ids
         self.backtest_system = backtest_system
+        self.render_mode = render_mode
 
         # Define action and observation space
         self.action_space = spaces.MultiDiscrete(
@@ -211,4 +213,34 @@ class TradingEnv(gym.Env):
             f"inv={self.inventory}, "
             f"prices={next_prices}"
         )
+        if self.render_mode == "human" and terminated:
+            self.render()
         return obs, float(reward), terminated, truncated, info
+
+    def render(self):
+        """Plot asset history for the episode."""
+        if self.render_mode != "human":
+            return
+
+        import time
+
+        import matplotlib.pyplot as plt
+
+        fname = f"img/asset_history{time.strftime('%Y-%m-%d_%H-%M-%S')}.png"
+        final_asset = self.asset_history[-1]
+        return_pct = (final_asset / self.initial_cash - 1) * 100
+
+        fig, ax = plt.subplots(figsize=(12, 4))
+        ax.plot(self.asset_history, color="steelblue", linewidth=1.5)
+        ax.axhline(self.initial_cash, color="gray", linestyle="--", linewidth=1)
+        ax.set_title(
+            f"Asset History | Final: {final_asset:,.0f} TWD | "
+            f"Return: {return_pct:+.2f}% | Trades: {self.total_trades}"
+        )
+        ax.set_xlabel("Step")
+        ax.set_ylabel("Total Asset (TWD)")
+        ax.grid(alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(fname, dpi=100)
+        plt.close(fig)
+        print(f"Saved {fname}  (final={final_asset:,.0f}, return={return_pct:+.2f}%)")
