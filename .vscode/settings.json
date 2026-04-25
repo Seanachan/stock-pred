@@ -1,0 +1,23 @@
+{
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": false,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+  "files.trimTrailingWhitespace": true,
+  "files.trimFinalNewlines": true,
+  "files.insertFinalNewline": true,
+  "ruff.nativeServer": "on",
+  "ruff.lint.enable": true,
+  "ruff.organizeImports": true,
+  "ruff.fixAll": true,
+  "pylint.args": ["--disable=C0114,C0115,C0116"],
+  "python-envs.defaultEnvManager": "ms-python.python:conda",
+  "python-envs.defaultPackageManager": "ms-python.python:conda",
+  "python.analysis.extraPaths": ["stock_backtest_"],
+  "python.autoComplete.extraPaths": ["stock_backtest_"]
+}

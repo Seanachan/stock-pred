@@ -1,0 +1,81 @@
+generated_at: '2026-04-22T18:34:22'
+requested_start: '20150101'
+requested_end: '20260422'
+source: stock_api (TWSE official)
+split_suggestion:
+  train: 2015-01 .. 2022-12
+  val: 2023-01 .. 2023-12
+  test: 2024-01 .. 2026-04
+schema:
+- date
+- capacity
+- turnover
+- high
+- low
+- close
+- change
+- transaction_volume
+- stock_code_id
+- open
+stocks:
+  '2330':
+    name: 台積電
+    rows: 2707
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2317':
+    name: 鴻海
+    rows: 2697
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2454':
+    name: 聯發科
+    rows: 2732
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2382':
+    name: 廣達
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2308':
+    name: 台達電
+    rows: 2749
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2891':
+    name: 中信金
+    rows: 2694
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2881':
+    name: 富邦金
+    rows: 2729
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2412':
+    name: 中華電
+    rows: 2685
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2303':
+    name: 聯電
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '2882':
+    name: 國泰金
+    rows: 2645
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+failures: []
