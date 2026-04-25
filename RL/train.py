@@ -11,7 +11,7 @@ import RL.env  # noqa: F401
 from RL.constant import stock_ids, train_end, train_start
 
 
-def train_agent(env: DummyVecEnv, total_timesteps: int = 100000):
+def train_agent(env: DummyVecEnv, total_timesteps: int = 300000, seed: int = 0):
     # Define MLP policy for PPO
     # policy: Actor to output action probabilities
     # value_function: Critic to estimate state values
@@ -22,7 +22,7 @@ def train_agent(env: DummyVecEnv, total_timesteps: int = 100000):
     )
 
     # Initialize PPO agent
-    print("Initializing PPO agent...")
+    print(f"Initializing PPO agent (seed={seed})...")
     model = PPO(
         "MlpPolicy",
         env,
@@ -34,16 +34,18 @@ def train_agent(env: DummyVecEnv, total_timesteps: int = 100000):
         gamma=0.99,
         ent_coef=0.01,
         verbose=1,
+        target_kl=0.05,
+        seed=seed,
         device="cuda" if torch.cuda.is_available() else "cpu",
+        tensorboard_log="./tb_logs/",
     )
     # Train the agent
     env.reset()
-    print("Starting training...")
-    model.learn(total_timesteps=total_timesteps)
-    env.render()
+    print(f"Starting training (seed={seed})...")
+    model.learn(total_timesteps=total_timesteps, tb_log_name=f"PPO_seed{seed}")
 
-    model.save("ppo_trading_agent_v1")
-    print("Training completed.")
+    model.save(f"ppo_trading_agent_v3_seed{seed}")
+    print(f"Training completed (seed={seed}). Saved ppo_trading_agent_v3_seed{seed}.zip")
 
 
 def load_data(data_dir: str = f"{os.getcwd()}/RL/data/") -> dict:
@@ -71,5 +73,9 @@ def make_env(stock_data):
 
 if __name__ == "__main__":
     stock_data = load_data()
-    env = DummyVecEnv([make_env(stock_data)])
-    train_agent(env=env)
+    seeds = [0, 1, 2]
+    for seed in seeds:
+        print(f"\n{'=' * 60}\n=== Training seed {seed} ===\n{'=' * 60}")
+        env = DummyVecEnv([make_env(stock_data)])
+        train_agent(env=env, seed=seed)
+        env.close()

@@ -48,9 +48,8 @@ class TradingEnv(gym.Env):
         self.render_mode = render_mode
 
         # Define action and observation space
-        self.action_space = spaces.MultiDiscrete(
-            [3] * self.num_stocks  # e.g., Sell, Hold, Buy
-        )
+        # 0=sell_2, 1=sell_1, 2=hold, 3=buy_1, 4=buy_2 per stock
+        self.action_space = spaces.MultiDiscrete([5] * self.num_stocks)
         self.observation_dim = (
             (self.num_stocks * 8) + 1 + self.num_stocks
         )  #  8 features per stock + cash balance + current holdings
@@ -139,34 +138,44 @@ class TradingEnv(gym.Env):
 
     def step(self, action=None) -> tuple[np.ndarray, float, bool, bool, dict]:
         """Execute one time step within the environment"""
-        current_prices = self.price_memory[self.current_step]
+        current_prices = (
+            self.price_memory[self.current_step - 1]
+            if self.current_step > 0
+            else self.price_memory[0]
+        )
         step_trades = 0
 
+        # Action mapping: 0=sell_2, 1=sell_1, 2=hold, 3=buy_1, 4=buy_2
         for i, act in enumerate(action):
             price = current_prices[i]
             if price == 0 or np.isnan(price):
                 continue
 
-            if act == TradeStatus.BUY:
-                cost = price * 1000
+            if act == 4 or act == 3:
+                lots = 2 if act == 4 else 1
+                cost = lots * price * 1000
                 transaction_fee = max(
                     cost * self.transaction_fee_rate, self.min_transaction_fee
                 )
                 if self.cash_balance >= cost + transaction_fee:
                     self.cash_balance -= cost + transaction_fee
-                    self.inventory[i] += 1000
+                    self.inventory[i] += 1000 * lots
                     step_trades += 1
 
-            elif act == TradeStatus.SELL:
-                if self.inventory[i] > 0:
+            elif act == 1 or act == 0:
+                lots_to_sell = 2 if act == 0 else 1
+                available_lots = self.inventory[i] // 1000
+                lots_to_sell = min(lots_to_sell, available_lots)
+                if lots_to_sell > 0:
+                    shares = lots_to_sell * 1000
                     revenue = (
-                        price * 1000 * (1 - self.tax_rate - self.transaction_fee_rate)
+                        shares * price * (1 - self.tax_rate - self.transaction_fee_rate)
                     )
                     self.cash_balance += revenue
-                    self.inventory[i] -= 1000
+                    self.inventory[i] -= shares
                     step_trades += 1
 
-            elif act == TradeStatus.HOLD:
+            elif act == 2:
                 pass
 
         self.total_trades += step_trades
@@ -181,13 +190,27 @@ class TradingEnv(gym.Env):
             self.price_memory[self.current_step] if not terminated else current_prices
         )
 
-        # Reward
+        # Reward = active return (agent log-return - EW basket log-return)
         stock_value = np.sum(self.inventory * next_prices)
         current_total_asset = self.cash_balance + stock_value
         previous_total_asset = self.asset_history[-1]
-        reward = float(
+
+        # Equal-weight basket return per step (relative to prior step prices)
+        valid_now = (next_prices > 0) & ~np.isnan(next_prices)
+        valid_prev = (current_prices > 0) & ~np.isnan(current_prices)
+        valid = valid_now & valid_prev
+        if valid.any():
+            ew_step_return = float(
+                np.mean(next_prices[valid] / current_prices[valid]) - 1.0
+            )
+        else:
+            ew_step_return = 0.0
+        ew_log_ret = float(np.log(max(1.0 + ew_step_return, 1e-8)))
+
+        agent_log_ret = float(
             np.log(max(current_total_asset, 1) / max(previous_total_asset, 1))
         )
+        reward = agent_log_ret - ew_log_ret
 
         if terminated and self.total_trades < 100:
             reward -= 1
