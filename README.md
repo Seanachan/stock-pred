@@ -5,13 +5,13 @@
 Creating virtual environment:
 
 ```shell
-conda create --name stock_env python=3.12
+uv venv --python python=3.12
 ```
 
-Activate virtual environment:
+Install Packages:
 
 ```shell
-conda activate stock_env
+uv pip install -r requirements.txt
 ```
 
 ## RL Model Feaure
