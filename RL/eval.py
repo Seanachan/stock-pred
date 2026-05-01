@@ -5,19 +5,21 @@ import gymnasium as gym
 import pandas as pd
 import torch
 from stable_baselines3 import PPO
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 import RL.env  # noqa: F401
 from RL.constant import (  # noqa: F401
     stock_ids,
     test_end,
     test_start,
+    train_end,
+    train_start,
     val_end,
     val_start,
 )
 
 
-def val_agent(env: DummyVecEnv, model_path: str) -> dict:
+def val_agent(env, model_path: str) -> dict:
     print(f"Loading {model_path}...")
     model = PPO.load(
         model_path,
@@ -75,7 +77,12 @@ def load_data(
 
 
 def make_env(stock_data):
-    return lambda: gym.make("TradingEnv-v0", stock_ids=stock_ids, stock_data=stock_data)
+    return lambda: gym.make(
+        "TradingEnv-v0",
+        stock_ids=stock_ids,
+        stock_data=stock_data,
+        eval_mode=True,
+    )
 
 
 if __name__ == "__main__":
@@ -84,6 +91,8 @@ if __name__ == "__main__":
     split = sys.argv[1] if len(sys.argv) > 1 else "val"
     if split == "test":
         start, end = test_start, test_end
+    elif split == "train":
+        start, end = train_start, train_end
     else:
         start, end = val_start, val_end
     print(f"Eval split: {split}  ({start} .. {end})")
@@ -96,14 +105,24 @@ if __name__ == "__main__":
         if len(df) > 1:
             ew_returns.append(df["close"].iloc[-1] / df["close"].iloc[0] - 1)
     ew_basket_return = sum(ew_returns) / max(1, len(ew_returns))
-    print(f"EW-{len(ew_returns)} basket return on {split}: {ew_basket_return * 100:+.2f}%")
+    print(
+        f"EW-{len(ew_returns)} basket return on {split}: {ew_basket_return * 100:+.2f}%"
+    )
 
-    seeds = [0, 1, 2]
+    seeds = [0]
     results = []
     for seed in seeds:
         print(f"\n{'=' * 60}\n=== Eval seed {seed} ({split}) ===\n{'=' * 60}")
         env = DummyVecEnv([make_env(stock_data)])
-        model_path = f"ppo_trading_agent_v3_seed{seed}"
+        norm_path = f"vec_normalize_v7_seed{seed}.pkl"
+        if os.path.exists(norm_path):
+            env = VecNormalize.load(norm_path, env)
+            env.training = False
+            env.norm_reward = False
+            print(f"Loaded {norm_path}")
+        else:
+            print(f"WARN: {norm_path} not found, running without normalization")
+        model_path = f"ppo_trading_agent_v7_seed{seed}"
         result = val_agent(env=env, model_path=model_path)
         result["seed"] = seed
         results.append(result)

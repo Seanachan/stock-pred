@@ -6,8 +6,6 @@ from gymnasium import spaces
 from gymnasium.envs.registration import register
 
 from RL.feature import FeatureExtractor
-from RL.status import TradeStatus
-
 from .constant import stock_ids
 
 # Register as gyn envronment, so that it can be used with stable-baselines3 and other RL libraries
@@ -27,8 +25,12 @@ class TradingEnv(gym.Env):
         stock_data=None,
         backtest_system=None,
         render_mode=None,
+        eval_mode=False,
+        window_len=240,
     ):
         super(TradingEnv, self).__init__()
+        self.eval_mode = eval_mode
+        self.window_len = window_len
 
         if stock_data is None:
             raise ValueError("stock_data cannot be None")
@@ -40,6 +42,7 @@ class TradingEnv(gym.Env):
         self.cash_balance = self.initial_cash
         self.inventory = np.zeros(self.num_stocks, dtype=int)
         self.total_trades = 0
+        self._invalid_count = 0
 
         # For reward calculation and performance tracking
         self.asset_history = [self.initial_cash]
@@ -126,11 +129,19 @@ class TradingEnv(gym.Env):
         """Reset the environment and return the initial observation"""
         super().reset(seed=seed, options=options)
 
-        self.current_step = 0
+        if self.eval_mode:
+            self.start_step = 0
+            self.end_step = self.max_steps
+        else:
+            max_start = max(self.max_steps - self.window_len - 1, 1)
+            self.start_step = int(self.np_random.integers(0, max_start))
+            self.end_step = min(self.start_step + self.window_len, self.max_steps)
+
+        self.current_step = self.start_step
         self.cash_balance = self.initial_cash
         self.inventory = np.zeros(self.num_stocks, dtype=int)
         self.total_trades = 0
-
+        self._invalid_count = 0
         self.asset_history = [self.initial_cash]
 
         initialize_observation = self._get_obs()
@@ -138,12 +149,9 @@ class TradingEnv(gym.Env):
 
     def step(self, action=None) -> tuple[np.ndarray, float, bool, bool, dict]:
         """Execute one time step within the environment"""
-        current_prices = (
-            self.price_memory[self.current_step - 1]
-            if self.current_step > 0
-            else self.price_memory[0]
-        )
+        current_prices = self.price_memory[self.current_step]
         step_trades = 0
+        step_fees = 0.0
 
         # Action mapping: 0=sell_2, 1=sell_1, 2=hold, 3=buy_1, 4=buy_2
         for i, act in enumerate(action):
@@ -160,7 +168,10 @@ class TradingEnv(gym.Env):
                 if self.cash_balance >= cost + transaction_fee:
                     self.cash_balance -= cost + transaction_fee
                     self.inventory[i] += 1000 * lots
+                    step_fees += transaction_fee
                     step_trades += 1
+                else:
+                    self._invalid_count += 1
 
             elif act == 1 or act == 0:
                 lots_to_sell = 2 if act == 0 else 1
@@ -171,9 +182,15 @@ class TradingEnv(gym.Env):
                     revenue = (
                         shares * price * (1 - self.tax_rate - self.transaction_fee_rate)
                     )
+                    sell_cost = (
+                        shares * price * (self.tax_rate + self.transaction_fee_rate)
+                    )
                     self.cash_balance += revenue
                     self.inventory[i] -= shares
+                    step_fees += sell_cost
                     step_trades += 1
+                else:
+                    self._invalid_count += 1
 
             elif act == 2:
                 pass
@@ -184,7 +201,7 @@ class TradingEnv(gym.Env):
         self.current_step += 1
 
         # Recalculate asset
-        terminated = self.current_step >= self.max_steps
+        terminated = self.current_step >= self.end_step
         truncated = False
         next_prices = (
             self.price_memory[self.current_step] if not terminated else current_prices
@@ -212,14 +229,28 @@ class TradingEnv(gym.Env):
         )
         reward = agent_log_ret - ew_log_ret
 
-        if terminated and self.total_trades < 100:
-            reward -= 1
+        peak = max(self.asset_history)
+        drawdown = (peak - current_total_asset) / max(peak, 1)
+        reward -= 0.1 * max(drawdown - 0.1, 0)
+
+        turnover_cost = step_fees / max(previous_total_asset, 1)
+        reward -= turnover_cost
+
+        if current_total_asset > 0:
+            weights = (self.inventory * next_prices) / current_total_asset
+            herfindahl = float(np.sum(weights**2))
+            reward -= 0.5 * max(herfindahl - 0.3, 0)
+
+        invalid_penalty = self._invalid_count * 0.0001
+        reward -= invalid_penalty
+        self._invalid_count = 0
 
         self.asset_history.append(current_total_asset)
 
         info = {
             "total_asset": current_total_asset,
             "total_trades": self.total_trades,
+            "total_fees": step_fees,
             "return_rate": (current_total_asset / self.initial_cash) - 1,
             "inventory": {
                 code: int(inventory)
