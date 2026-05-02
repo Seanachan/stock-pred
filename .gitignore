@@ -214,3 +214,8 @@ RL/data/fetch.log
 # Trained Model
 *.zip
 img/
+
+# RL training artifacts (regenerated per run)
+tb_logs/
+*.pkl
+backtest_performance.xlsx

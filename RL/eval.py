@@ -114,7 +114,7 @@ if __name__ == "__main__":
     for seed in seeds:
         print(f"\n{'=' * 60}\n=== Eval seed {seed} ({split}) ===\n{'=' * 60}")
         env = DummyVecEnv([make_env(stock_data)])
-        norm_path = f"vec_normalize_v7_seed{seed}.pkl"
+        norm_path = f"vec_normalize_v8_seed{seed}.pkl"
         if os.path.exists(norm_path):
             env = VecNormalize.load(norm_path, env)
             env.training = False
@@ -122,7 +122,7 @@ if __name__ == "__main__":
             print(f"Loaded {norm_path}")
         else:
             print(f"WARN: {norm_path} not found, running without normalization")
-        model_path = f"ppo_trading_agent_v7_seed{seed}"
+        model_path = f"ppo_trading_agent_v8_seed{seed}"
         result = val_agent(env=env, model_path=model_path)
         result["seed"] = seed
         results.append(result)

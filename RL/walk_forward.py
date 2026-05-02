@@ -48,7 +48,7 @@ def make_env(stock_data, eval_mode=False):
     )
 
 
-def train_fold(stock_data, fold_idx, total_timesteps=1_000_000):
+def train_fold(stock_data, fold_idx, total_timesteps=2_000_000):
     env = SubprocVecEnv([make_env(stock_data) for _ in range(8)])
     env = VecMonitor(env)
     env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=10.0, gamma=0.99)
@@ -58,7 +58,7 @@ def train_fold(stock_data, fold_idx, total_timesteps=1_000_000):
         env,
         policy_kwargs=dict(
             activation_fn=nn.ReLU,
-            net_arch=dict(pi=[128, 128], vf=[128, 128]),
+            net_arch=dict(pi=[512, 256], vf=[512, 256]),
         ),
         learning_rate=get_linear_fn(3e-4, 1e-5, 1.0),
         n_steps=1024,
@@ -74,10 +74,10 @@ def train_fold(stock_data, fold_idx, total_timesteps=1_000_000):
         device="cuda" if torch.cuda.is_available() else "cpu",
         tensorboard_log="./tb_logs/",
     )
-    model.learn(total_timesteps=total_timesteps, tb_log_name=f"PPO_wf_fold{fold_idx}")
+    model.learn(total_timesteps=total_timesteps, tb_log_name=f"PPO_wf_v10_fold{fold_idx}")
 
-    model_path = f"ppo_wf_fold{fold_idx}"
-    norm_path = f"vec_normalize_wf_fold{fold_idx}.pkl"
+    model_path = f"ppo_wf_v10_fold{fold_idx}"
+    norm_path = f"vec_normalize_wf_v10_fold{fold_idx}.pkl"
     model.save(model_path)
     env.save(norm_path)
     env.close()
@@ -172,6 +172,6 @@ if __name__ == "__main__":
     pos = sum(1 for a in alphas if a > 0)
     print(f"folds with positive alpha: {pos}/{len(alphas)}")
 
-    with open("walk_forward_results.json", "w") as f:
+    with open("walk_forward_v10_results.json", "w") as f:
         json.dump(results, f, indent=2, default=str)
     print("\nSaved walk_forward_results.json")

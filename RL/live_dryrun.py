@@ -20,7 +20,15 @@ from RL.constant import stock_ids
 from RL.feature import FeatureExtractor
 from stock_api import Get_User_Stocks, get_taiwan_stock_data
 
-ACTION_LABELS = {0: "SELL_2", 1: "SELL_1", 2: "HOLD", 3: "BUY_1", 4: "BUY_2"}
+ACTION_LABELS = {
+    0: "SELL_100%",
+    1: "SELL_50%",
+    2: "SELL_25%",
+    3: "HOLD",
+    4: "BUY_5%",
+    5: "BUY_15%",
+    6: "BUY_30%",
+}
 
 
 def fetch_history(start_date: str, end_date: str) -> dict:
@@ -123,8 +131,8 @@ if __name__ == "__main__":
         print("Missing ACCOUNT/PASSWORD in env. Aborting.")
         sys.exit(1)
 
-    model_path = sys.argv[1] if len(sys.argv) > 1 else "ppo_trading_agent_v7_seed0"
-    norm_path = sys.argv[2] if len(sys.argv) > 2 else "vec_normalize_v7_seed0.pkl"
+    model_path = sys.argv[1] if len(sys.argv) > 1 else "ppo_trading_agent_v8_seed0"
+    norm_path = sys.argv[2] if len(sys.argv) > 2 else "vec_normalize_v8_seed0.pkl"
     today = datetime.date.today()
     start = (today - datetime.timedelta(days=120)).strftime("%Y%m%d")
     end = today.strftime("%Y%m%d")

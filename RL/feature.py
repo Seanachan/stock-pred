@@ -10,13 +10,14 @@ from pandas_ta.volatility import atr, bbands
 class FeatureExtractor:
     def __init__(self, stock_ids: List[str]):
         self.stock_ids = stock_ids
-        self.feature_dim_per_stock = 8
+        self.feature_dim_per_stock = 12
 
     def extract_features(
         self, stock_data: Dict[str, DataFrame]
     ) -> Dict[str, DataFrame]:
         """
         Transform history stock data into feature vectors for each stock.
+        Returns 8 stock-local + 4 cross-sectional rank features per stock.
         """
         market_dfs: Dict[str, DataFrame] = {}
 
@@ -68,5 +69,22 @@ class FeatureExtractor:
             df_copy["capacity_change"] = df_copy["capacity"].pct_change()
 
             market_dfs[stock_id] = df_copy
+
+        # Cross-sectional rank features (per-day percentile across basket)
+        rank_metrics = ["return", "rsi_14", "bias_20", "capacity_change"]
+        for metric in rank_metrics:
+            wide = DataFrame(
+                {
+                    sid: market_dfs[sid][metric]
+                    for sid in market_dfs
+                    if metric in market_dfs[sid].columns
+                }
+            )
+            ranked = wide.rank(axis=1, pct=True)  # 0..1 percentile per day
+            for sid in market_dfs:
+                if sid in ranked.columns:
+                    market_dfs[sid][f"{metric}_rank"] = ranked[sid]
+                else:
+                    market_dfs[sid][f"{metric}_rank"] = 0.5
 
         return market_dfs

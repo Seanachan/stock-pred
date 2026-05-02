@@ -1,9 +1,16 @@
+import sys
 import time
 from typing import cast
 
 import pandas as pd
 
-from .utils import clean_numeric, month_starts, roc_to_ad, safe_get_json
+from .utils import (
+    UpstreamHTMLResponse,
+    clean_numeric,
+    month_starts,
+    roc_to_ad,
+    safe_get_json,
+)
 
 
 # TWSE
@@ -20,7 +27,15 @@ def get_twse_stock_data(
             "stockNo": stock_code,
         }
 
-        raw = safe_get_json(url, params=params)
+        try:
+            raw = safe_get_json(url, params=params)
+        except UpstreamHTMLResponse as e:
+            print(
+                f"[{stock_code}] TWSE upstream HTML at {month_start}: {e}; skipping month",
+                file=sys.stderr,
+            )
+            time.sleep(2.0)
+            continue
 
         if raw.get("stat") != "OK" or not raw.get("data"):
             time.sleep(2.0)
@@ -133,7 +148,15 @@ def get_tpex_stock_data(
             "response": "json",
         }
 
-        raw = safe_get_json(url, params=params)
+        try:
+            raw = safe_get_json(url, params=params)
+        except UpstreamHTMLResponse as e:
+            print(
+                f"[{stock_code}] TPEX upstream HTML at {month_start}: {e}; skipping month",
+                file=sys.stderr,
+            )
+            time.sleep(2.0)
+            continue
 
         if raw.get("stat", "").lower() != "ok":
             time.sleep(2.0)
@@ -160,6 +183,7 @@ def get_tpex_stock_data(
                 columns={
                     "日 期": "date",
                     "成交張數": "capacity",
+                    "成交仟股": "capacity",
                     "成交仟元": "turnover",
                     "開盤": "open",
                     "最高": "high",
@@ -171,8 +195,6 @@ def get_tpex_stock_data(
             ),
         )
 
-        df["date"] = df["date"].apply(roc_to_ad)
-
         numeric_cols = [
             "capacity",
             "turnover",
@@ -183,6 +205,18 @@ def get_tpex_stock_data(
             "change",
             "transaction_volume",
         ]
+        missing = [c for c in numeric_cols if c not in df.columns]
+        if missing or "date" not in df.columns:
+            print(
+                f"[{stock_code}] TPEX schema missing {missing or ['date']} for month "
+                f"{month_start}; raw fields={list(df.columns)}; skipping",
+                file=sys.stderr,
+            )
+            time.sleep(2.0)
+            continue
+
+        df["date"] = df["date"].apply(roc_to_ad)
+
         for col in numeric_cols:
             df[col] = clean_numeric(cast(pd.Series, df[col]))
 
@@ -262,7 +296,15 @@ def get_esb_stock_data(stock_code: str, start_date: str, end_date: str) -> pd.Da
             "response": "json",
         }
 
-        raw = safe_get_json(url, params=params)
+        try:
+            raw = safe_get_json(url, params=params)
+        except UpstreamHTMLResponse as e:
+            print(
+                f"[{stock_code}] ESB upstream HTML at {month_start}: {e}; skipping month",
+                file=sys.stderr,
+            )
+            time.sleep(2.0)
+            continue
 
         if raw.get("stat", "").lower() != "ok":
             time.sleep(2.0)

@@ -51,11 +51,13 @@ class TradingEnv(gym.Env):
         self.render_mode = render_mode
 
         # Define action and observation space
-        # 0=sell_2, 1=sell_1, 2=hold, 3=buy_1, 4=buy_2 per stock
-        self.action_space = spaces.MultiDiscrete([5] * self.num_stocks)
+        # 0=sell_100%, 1=sell_50%, 2=sell_25%, 3=hold,
+        # 4=buy_5%_cash, 5=buy_15%_cash, 6=buy_30%_cash per stock
+        self.action_space = spaces.MultiDiscrete([7] * self.num_stocks)
+        self.feat_per_stock = 12
         self.observation_dim = (
-            (self.num_stocks * 8) + 1 + self.num_stocks
-        )  #  8 features per stock + cash balance + current holdings
+            (self.num_stocks * self.feat_per_stock) + 1 + self.num_stocks
+        )  # 12 features per stock + cash balance + current holdings
 
         self.observation_space = spaces.Box(
             low=-np.inf,
@@ -81,7 +83,7 @@ class TradingEnv(gym.Env):
             (self.max_steps + 1, self.num_stocks)
         )  # 1D df for stock prices
         self.features_memory = np.zeros(
-            (self.max_steps + 1, self.num_stocks * 8)
+            (self.max_steps + 1, self.num_stocks * self.feat_per_stock)
         )  # Flattened features for all stocks
         self.cash_balance = self.initial_cash
 
@@ -104,11 +106,15 @@ class TradingEnv(gym.Env):
                         row["bb_pos"],
                         row["atr"],
                         row["capacity_change"],
+                        row.get("return_rank", 0.5),
+                        row.get("rsi_14_rank", 0.5),
+                        row.get("bias_20_rank", 0.5),
+                        row.get("capacity_change_rank", 0.5),
                     ]
                     day_features.extend(stock_features)
                 else:
                     self.price_memory[i, j] = 0.0
-                    day_features.extend([0.0] * 8)
+                    day_features.extend([0.0] * self.feat_per_stock)
 
             self.features_memory[i] = np.nan_to_num(
                 day_features, nan=0.0, posinf=1.0, neginf=-1.0
@@ -144,56 +150,76 @@ class TradingEnv(gym.Env):
         self._invalid_count = 0
         self.asset_history = [self.initial_cash]
 
+        # BH baseline: invest initial cash equally across valid stocks at start prices
+        start_prices = self.price_memory[self.start_step]
+        valid_start = (start_prices > 0) & ~np.isnan(start_prices)
+        n_valid = int(valid_start.sum())
+        self.bh_shares = np.zeros(self.num_stocks, dtype=np.float64)
+        if n_valid > 0:
+            per_stock_cash = self.initial_cash / n_valid
+            self.bh_shares[valid_start] = per_stock_cash / start_prices[valid_start]
+
         initialize_observation = self._get_obs()
         return initialize_observation, {}
 
     def step(self, action=None) -> tuple[np.ndarray, float, bool, bool, dict]:
-        """Execute one time step within the environment"""
+        """Execute one time step within the environment.
+
+        Action per stock (MultiDiscrete[7]):
+            0=sell_100%, 1=sell_50%, 2=sell_25%, 3=hold,
+            4=buy_5%_cash, 5=buy_15%_cash, 6=buy_30%_cash
+        """
         current_prices = self.price_memory[self.current_step]
         step_trades = 0
         step_fees = 0.0
 
-        # Action mapping: 0=sell_2, 1=sell_1, 2=hold, 3=buy_1, 4=buy_2
+        BUY_PCT = {4: 0.05, 5: 0.15, 6: 0.30}
+        SELL_PCT = {0: 1.0, 1: 0.5, 2: 0.25}
+
+        # Pass 1: sells first to free up cash
         for i, act in enumerate(action):
             price = current_prices[i]
             if price == 0 or np.isnan(price):
                 continue
-
-            if act == 4 or act == 3:
-                lots = 2 if act == 4 else 1
-                cost = lots * price * 1000
-                transaction_fee = max(
-                    cost * self.transaction_fee_rate, self.min_transaction_fee
-                )
-                if self.cash_balance >= cost + transaction_fee:
-                    self.cash_balance -= cost + transaction_fee
-                    self.inventory[i] += 1000 * lots
-                    step_fees += transaction_fee
-                    step_trades += 1
-                else:
-                    self._invalid_count += 1
-
-            elif act == 1 or act == 0:
-                lots_to_sell = 2 if act == 0 else 1
+            if int(act) in SELL_PCT:
+                pct = SELL_PCT[int(act)]
                 available_lots = self.inventory[i] // 1000
-                lots_to_sell = min(lots_to_sell, available_lots)
+                lots_to_sell = int(available_lots * pct)
                 if lots_to_sell > 0:
                     shares = lots_to_sell * 1000
-                    revenue = (
-                        shares * price * (1 - self.tax_rate - self.transaction_fee_rate)
-                    )
-                    sell_cost = (
-                        shares * price * (self.tax_rate + self.transaction_fee_rate)
-                    )
-                    self.cash_balance += revenue
+                    gross = shares * price
+                    cost = gross * (self.tax_rate + self.transaction_fee_rate)
+                    self.cash_balance += gross - cost
                     self.inventory[i] -= shares
-                    step_fees += sell_cost
+                    step_fees += cost
                     step_trades += 1
                 else:
                     self._invalid_count += 1
 
-            elif act == 2:
-                pass
+        # Pass 2: buys with updated cash
+        for i, act in enumerate(action):
+            price = current_prices[i]
+            if price == 0 or np.isnan(price):
+                continue
+            if int(act) in BUY_PCT:
+                pct = BUY_PCT[int(act)]
+                budget = self.cash_balance * pct
+                lots = int(budget // (price * 1000))
+                if lots > 0:
+                    cost = lots * price * 1000
+                    fee = max(
+                        cost * self.transaction_fee_rate, self.min_transaction_fee
+                    )
+                    if self.cash_balance >= cost + fee:
+                        self.cash_balance -= cost + fee
+                        self.inventory[i] += lots * 1000
+                        step_fees += fee
+                        step_trades += 1
+                    else:
+                        self._invalid_count += 1
+                else:
+                    self._invalid_count += 1
+            # act == 3: hold, noop
 
         self.total_trades += step_trades
 
@@ -207,38 +233,41 @@ class TradingEnv(gym.Env):
             self.price_memory[self.current_step] if not terminated else current_prices
         )
 
-        # Reward = active return (agent log-return - EW basket log-return)
-        stock_value = np.sum(self.inventory * next_prices)
+        stock_value = float(np.sum(self.inventory * next_prices))
         current_total_asset = self.cash_balance + stock_value
         previous_total_asset = self.asset_history[-1]
 
-        # Equal-weight basket return per step (relative to prior step prices)
-        valid_now = (next_prices > 0) & ~np.isnan(next_prices)
-        valid_prev = (current_prices > 0) & ~np.isnan(current_prices)
-        valid = valid_now & valid_prev
-        if valid.any():
-            ew_step_return = float(
-                np.mean(next_prices[valid] / current_prices[valid]) - 1.0
-            )
-        else:
-            ew_step_return = 0.0
-        ew_log_ret = float(np.log(max(1.0 + ew_step_return, 1e-8)))
+        # BH baseline value at next/current prices
+        valid_next = (next_prices > 0) & ~np.isnan(next_prices)
+        valid_cur = (current_prices > 0) & ~np.isnan(current_prices)
+        bh_value_now = float(np.sum(self.bh_shares[valid_next] * next_prices[valid_next]))
+        bh_value_prev = (
+            float(np.sum(self.bh_shares[valid_cur] * current_prices[valid_cur]))
+            if valid_cur.any()
+            else float(self.initial_cash)
+        )
 
+        bh_log_ret = float(np.log(max(bh_value_now, 1) / max(bh_value_prev, 1)))
         agent_log_ret = float(
             np.log(max(current_total_asset, 1) / max(previous_total_asset, 1))
         )
-        reward = agent_log_ret - ew_log_ret
+        reward = agent_log_ret - bh_log_ret
 
+        # Drawdown penalty
         peak = max(self.asset_history)
         drawdown = (peak - current_total_asset) / max(peak, 1)
         reward -= 0.1 * max(drawdown - 0.1, 0)
 
+        # Explicit turnover cost (helps gradient see fees directly)
         turnover_cost = step_fees / max(previous_total_asset, 1)
         reward -= turnover_cost
 
+        # Concentration penalty including cash (forces deployment)
         if current_total_asset > 0:
-            weights = (self.inventory * next_prices) / current_total_asset
-            herfindahl = float(np.sum(weights**2))
+            full_weights = np.append(
+                self.inventory * next_prices, self.cash_balance
+            ) / current_total_asset
+            herfindahl = float(np.sum(full_weights**2))
             reward -= 0.5 * max(herfindahl - 0.3, 0)
 
         invalid_penalty = self._invalid_count * 0.0001
@@ -252,6 +281,7 @@ class TradingEnv(gym.Env):
             "total_trades": self.total_trades,
             "total_fees": step_fees,
             "return_rate": (current_total_asset / self.initial_cash) - 1,
+            "bh_value": bh_value_now,
             "inventory": {
                 code: int(inventory)
                 for code, inventory in zip(self.stock_ids, self.inventory)

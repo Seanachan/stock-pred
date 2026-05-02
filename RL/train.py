@@ -37,11 +37,11 @@ def train_agent(env, total_timesteps: int = 2_000_000, seed: int = 0):
     )
     env.reset()
     print(f"Starting training (seed={seed})...")
-    model.learn(total_timesteps=total_timesteps, tb_log_name=f"PPO_v7_seed{seed}")
+    model.learn(total_timesteps=total_timesteps, tb_log_name=f"PPO_v8_seed{seed}")
 
-    model.save(f"ppo_trading_agent_v7_seed{seed}")
-    env.save(f"vec_normalize_v7_seed{seed}.pkl")
-    print(f"Training completed (seed={seed}). Saved ppo_trading_agent_v7_seed{seed}.zip + vec_normalize_v7_seed{seed}.pkl")
+    model.save(f"ppo_trading_agent_v8_seed{seed}")
+    env.save(f"vec_normalize_v8_seed{seed}.pkl")
+    print(f"Training completed (seed={seed}). Saved ppo_trading_agent_v8_seed{seed}.zip + vec_normalize_v8_seed{seed}.pkl")
 
 
 def load_data(data_dir: str = f"{os.getcwd()}/RL/data/") -> dict:
