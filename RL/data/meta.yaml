@@ -1,4 +1,4 @@
-generated_at: '2026-04-22T18:34:22'
+generated_at: '2026-05-01T16:47:04'
 requested_start: '20150101'
 requested_end: '20260422'
 source: stock_api (TWSE official)
@@ -36,27 +36,87 @@ stocks:
     first_date: '2015-01-05'
     last_date: '2026-04-22'
     status: cached
-  '2382':
-    name: 廣達
-    rows: 2751
-    first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: cached
   '2308':
     name: 台達電
     rows: 2749
     first_date: '2015-01-05'
     last_date: '2026-04-22'
     status: cached
-  '2891':
-    name: 中信金
-    rows: 2694
+  '2382':
+    name: 廣達
+    rows: 2751
     first_date: '2015-01-05'
     last_date: '2026-04-22'
     status: cached
-  '2881':
-    name: 富邦金
-    rows: 2729
+  '2303':
+    name: 聯電
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '3711':
+    name: 日月光投控
+    rows: 1886
+    first_date: '2018-04-30'
+    last_date: '2026-04-22'
+    status: fetched
+  '6669':
+    name: 緯穎
+    rows: 1719
+    first_date: '2019-03-27'
+    last_date: '2026-04-22'
+    status: fetched
+  '5347':
+    name: 世界
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '8046':
+    name: 南電
+    rows: 2685
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2474':
+    name: 可成
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2354':
+    name: 鴻準
+    rows: 2737
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2376':
+    name: 技嘉
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '3034':
+    name: 聯詠
+    rows: 2733
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '3008':
+    name: 大立光
+    rows: 2754
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '3045':
+    name: 台灣大
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '4904':
+    name: 遠傳
+    rows: 2751
     first_date: '2015-01-05'
     last_date: '2026-04-22'
     status: cached
@@ -66,16 +126,196 @@ stocks:
     first_date: '2015-01-05'
     last_date: '2026-04-22'
     status: cached
-  '2303':
-    name: 聯電
+  '8454':
+    name: 富邦媒
     rows: 2751
     first_date: '2015-01-05'
     last_date: '2026-04-22'
-    status: fetched
+    status: cached
+  '2881':
+    name: 富邦金
+    rows: 2729
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
   '2882':
     name: 國泰金
     rows: 2645
     first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2891':
+    name: 中信金
+    rows: 2694
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2884':
+    name: 玉山金
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2885':
+    name: 元大金
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2886':
+    name: 兆豐金
+    rows: 2710
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2887':
+    name: 台新金
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '2890':
+    name: 永豐金
+    rows: 2709
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '2880':
+    name: 華南金
+    rows: 2588
+    first_date: '2015-02-02'
+    last_date: '2026-04-22'
+    status: cached
+  '2892':
+    name: 第一金
+    rows: 2709
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '1101':
+    name: 台泥
+    rows: 2703
+    first_date: '2015-01-05'
+    last_date: '2026-03-31'
+    status: cached
+  '1102':
+    name: 亞泥
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '1216':
+    name: 統一
+    rows: 2669
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '1301':
+    name: 台塑
+    rows: 2684
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '1303':
+    name: 南亞
+    rows: 2709
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: cached
+  '1326':
+    name: 台化
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '2002':
+    name: 中鋼
+    rows: 2729
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '2207':
+    name: 和泰車
+    rows: 2729
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '6505':
+    name: 台塑化
+    rows: 2689
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '9910':
+    name: 豐泰
+    rows: 2738
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '2603':
+    name: 長榮
+    rows: 2724
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '2609':
+    name: 陽明
+    rows: 2742
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '2615':
+    name: 萬海
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '2618':
+    name: 長榮航
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '2912':
+    name: 統一超
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '5880':
+    name: 合庫金
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '6415':
+    name: 矽力
+    rows: 2727
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '6446':
+    name: 藥華藥
+    rows: 537
+    first_date: '2024-01-25'
+    last_date: '2026-04-22'
+    status: fetched
+  '9921':
+    name: 巨大
+    rows: 2751
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '3231':
+    name: 緯創
+    rows: 2730
+    first_date: '2015-01-05'
+    last_date: '2026-04-22'
+    status: fetched
+  '6770':
+    name: 力積電
+    rows: 1036
+    first_date: '2021-12-06'
     last_date: '2026-04-22'
     status: fetched
 failures: []
