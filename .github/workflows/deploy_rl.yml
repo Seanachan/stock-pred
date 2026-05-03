@@ -1,5 +1,8 @@
 name: Deploy RL Daily Trade
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 on:
   schedule:
     # 03:00 UTC = 11:00 TW (TW market 09:00-13:30). Buffer for cron jitter.
