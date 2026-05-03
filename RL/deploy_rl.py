@@ -70,22 +70,51 @@ def save_state(state: dict):
     STATE_FILE.write_text(json.dumps(state, indent=2, default=str))
 
 
-def fetch_history(days: int = HISTORY_DAYS) -> dict:
-    today = datetime.date.today()
-    start = (today - datetime.timedelta(days=days)).strftime("%Y%m%d")
-    end = today.strftime("%Y%m%d")
+DATA_DIR = Path("RL/data")
+CSV_STALE_DAYS = 7  # if CSV last_date older than this, refresh from API
+
+
+def load_csv(sid: str) -> pd.DataFrame | None:
+    """Return DataFrame indexed by date, or None if missing."""
+    fp = DATA_DIR / f"{sid}.csv"
+    if not fp.exists():
+        return None
+    df = pd.read_csv(fp, parse_dates=["date"], index_col="date")
+    df = df[~df.index.duplicated(keep="last")].sort_index()
+    return df
+
+
+def fetch_history(days: int = HISTORY_DAYS, force_refresh: bool = False) -> dict:
+    """Load price history. Prefer cached CSVs, refresh from TWSE if stale."""
+    today = pd.Timestamp(datetime.date.today())
+    start_date = today - pd.Timedelta(days=days)
     out = {}
+    n_from_csv, n_refreshed = 0, 0
     for sid in stock_ids:
-        try:
-            df = get_taiwan_stock_data(sid, start, end)
-            if df is None or df.empty:
-                continue
-            df = df.sort_values("date").reset_index(drop=True)
-            df["date"] = pd.to_datetime(df["date"])
-            df = df.set_index("date")
-            out[sid] = df
-        except Exception as e:
-            print(f"  [{sid}] fetch err: {e}")
+        df = load_csv(sid)
+        need_refresh = force_refresh or df is None or df.index.max() < today - pd.Timedelta(days=CSV_STALE_DAYS)
+        if need_refresh:
+            try:
+                fresh = get_taiwan_stock_data(
+                    sid, start_date.strftime("%Y%m%d"), today.strftime("%Y%m%d")
+                )
+                if fresh is not None and not fresh.empty:
+                    fresh = fresh.sort_values("date").reset_index(drop=True)
+                    fresh["date"] = pd.to_datetime(fresh["date"])
+                    fresh = fresh.set_index("date")
+                    if df is not None:
+                        df = pd.concat([df, fresh])
+                        df = df[~df.index.duplicated(keep="last")].sort_index()
+                    else:
+                        df = fresh
+                    n_refreshed += 1
+            except Exception as e:
+                print(f"  [{sid}] fetch err: {e}")
+        else:
+            n_from_csv += 1
+        if df is not None:
+            out[sid] = df.loc[df.index >= start_date]
+    print(f"  data sources: csv={n_from_csv}, refreshed={n_refreshed}")
     return out
 
 
@@ -223,6 +252,8 @@ if __name__ == "__main__":
     parser.add_argument("--paper", action="store_true")
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--status", action="store_true")
+    parser.add_argument("--refresh-data", action="store_true",
+                        help="force-refresh all CSVs from TWSE before predicting")
     args = parser.parse_args()
 
     state = load_state()
@@ -244,8 +275,8 @@ if __name__ == "__main__":
         save_state(state)
         sys.exit(0)
 
-    print("\nfetching latest data...")
-    stock_data = fetch_history()
+    print("\nloading data (csv preferred)...")
+    stock_data = fetch_history(force_refresh=args.refresh_data)
     if len(stock_data) < 30:
         print(f"ERROR: only {len(stock_data)} stocks fetched, abort.")
         sys.exit(1)
