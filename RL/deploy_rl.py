@@ -84,19 +84,28 @@ def load_csv(sid: str) -> pd.DataFrame | None:
     return df
 
 
+def save_csv(sid: str, df: pd.DataFrame):
+    """Persist refreshed data back to RL/data/<sid>.csv."""
+    fp = DATA_DIR / f"{sid}.csv"
+    out = df.reset_index().rename(columns={"index": "date"})
+    out.to_csv(fp, index=False)
+
+
 def fetch_history(days: int = HISTORY_DAYS, force_refresh: bool = False) -> dict:
-    """Load price history. Prefer cached CSVs, refresh from TWSE if stale."""
+    """Load price history. Prefer cached CSVs, refresh from TWSE if stale, write back."""
     today = pd.Timestamp(datetime.date.today())
     start_date = today - pd.Timedelta(days=days)
     out = {}
-    n_from_csv, n_refreshed = 0, 0
+    n_from_csv, n_refreshed, n_written = 0, 0, 0
     for sid in stock_ids:
         df = load_csv(sid)
         need_refresh = force_refresh or df is None or df.index.max() < today - pd.Timedelta(days=CSV_STALE_DAYS)
         if need_refresh:
             try:
+                # Only fetch the gap (last_date+1 → today), not full history
+                fetch_start = (df.index.max() + pd.Timedelta(days=1)) if df is not None else start_date
                 fresh = get_taiwan_stock_data(
-                    sid, start_date.strftime("%Y%m%d"), today.strftime("%Y%m%d")
+                    sid, fetch_start.strftime("%Y%m%d"), today.strftime("%Y%m%d")
                 )
                 if fresh is not None and not fresh.empty:
                     fresh = fresh.sort_values("date").reset_index(drop=True)
@@ -107,14 +116,16 @@ def fetch_history(days: int = HISTORY_DAYS, force_refresh: bool = False) -> dict
                         df = df[~df.index.duplicated(keep="last")].sort_index()
                     else:
                         df = fresh
-                    n_refreshed += 1
+                    save_csv(sid, df)
+                    n_written += 1
+                n_refreshed += 1
             except Exception as e:
                 print(f"  [{sid}] fetch err: {e}")
         else:
             n_from_csv += 1
         if df is not None:
             out[sid] = df.loc[df.index >= start_date]
-    print(f"  data sources: csv={n_from_csv}, refreshed={n_refreshed}")
+    print(f"  data sources: csv={n_from_csv}, refreshed={n_refreshed}, csv_written={n_written}")
     return out
 
 
