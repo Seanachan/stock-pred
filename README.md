@@ -16,9 +16,10 @@ Multi-stock PPO trading agent for Taiwan stocks (46 large/mid caps), with live d
 
 ```shell
 uv venv --python 3.12
-source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
+
+All commands below use `uv run` — no activation needed. uv resolves the venv automatically.
 
 ## Data
 
@@ -27,7 +28,7 @@ Per-stock daily CSVs live in `RL/data/<stock_id>.csv`. Schema: `date, capacity, 
 Fetch fresh history (TWSE / TPEX / ESB official endpoints, ~2s rate-limit per request):
 
 ```shell
-.venv/bin/python -m RL.fetch_data
+uv run python -m RL.fetch_data
 ```
 
 Coverage tracked in `RL/data/meta.yaml`.
@@ -70,7 +71,7 @@ Computed in `RL/feature.py` via `pandas_ta`:
 Rolling 6-month validation folds across 2019–2023, fixed 2015 train start:
 
 ```shell
-.venv/bin/python -m RL.walk_forward
+uv run python -m RL.walk_forward
 ```
 
 Outputs `walk_forward_<tag>_results.json` with per-fold return / EW / alpha / trades.
@@ -92,12 +93,12 @@ Single-fold training on most recent regime (`RL/train_deploy.py`):
 
 ```shell
 # Final deploy model (trains on all data through 2026-04-22, no val held out)
-.venv/bin/python -m RL.train_deploy --full
+uv run python -m RL.train_deploy --full
 
 # Held-out validation runs (for seed-stability check)
-.venv/bin/python -m RL.train_deploy --seed 0
-.venv/bin/python -m RL.train_deploy --seed 1
-.venv/bin/python -m RL.train_deploy --seed 2
+uv run python -m RL.train_deploy --seed 0
+uv run python -m RL.train_deploy --seed 1
+uv run python -m RL.train_deploy --seed 2
 ```
 
 Hyperparams: PPO, `pi=[512,256], vf=[512,256]`, ReLU, lr 3e-4→1e-5 linear, n_steps=1024, n_epochs=10, ent_coef=0.02, target_kl=0.1, 8 SubprocVecEnv parallel envs, 3M timesteps.
@@ -133,13 +134,13 @@ Daily cron pulls latest TWSE data, runs PPO inference, submits Buy/Sell via NCKU
 
 ```shell
 # Print today's actions, no orders submitted
-.venv/bin/python -m RL.deploy_rl --paper
+uv run python -m RL.deploy_rl --paper
 
 # Submit live (needs ACCOUNT/PASSWORD in .env)
-.venv/bin/python -m RL.deploy_rl --live
+uv run python -m RL.deploy_rl --live
 
 # Show ledger snapshot
-.venv/bin/python -m RL.deploy_rl --status
+uv run python -m RL.deploy_rl --status
 ```
 
 ### Risk Overlay
