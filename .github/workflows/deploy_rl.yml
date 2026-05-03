@@ -34,11 +34,11 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "requirements.txt"
 
-      - name: Setup Python
-        run: uv python install 3.12
+      - name: Create venv (uv-managed Python 3.12)
+        run: uv venv --python 3.12
 
       - name: Install dependencies
-        run: uv pip install --system -r requirements.txt
+        run: uv pip install -r requirements.txt
 
       - name: Run deploy
         env:
@@ -47,9 +47,9 @@ jobs:
         run: |
           MODE="${{ github.event.inputs.mode || 'live' }}"
           if [ "$MODE" = "live" ]; then
-            python -m RL.deploy_rl --live
+            uv run python -m RL.deploy_rl --live
           else
-            python -m RL.deploy_rl --paper
+            uv run python -m RL.deploy_rl --paper
           fi
 
       - name: Commit state
