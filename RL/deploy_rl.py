@@ -151,12 +151,12 @@ def execute_actions(actions, prices, state, account, password, live):
         cost = gross * (TAX + FEE)
         if live and account:
             try:
-                resp = Sell_Stock(account, password, sid, shares)
+                resp = Sell_Stock(account, password, sid, sell_lots, p)
             except Exception as e:
                 resp = f"ERR:{e}"
         else:
             resp = "PAPER"
-        log.append({"sid": sid, "action": "SELL", "label": ACTION_LABELS[a], "shares": shares, "price": p, "resp": str(resp)})
+        log.append({"sid": sid, "action": "SELL", "label": ACTION_LABELS[a], "lots": sell_lots, "shares": shares, "price": p, "resp": str(resp)})
         state["cash_balance"] += gross - cost
         state["inventory"][sid] -= shares
 
@@ -177,12 +177,12 @@ def execute_actions(actions, prices, state, account, password, live):
             continue
         if live and account:
             try:
-                resp = Buy_Stock(account, password, sid, shares)
+                resp = Buy_Stock(account, password, sid, lots, p)
             except Exception as e:
                 resp = f"ERR:{e}"
         else:
             resp = "PAPER"
-        log.append({"sid": sid, "action": "BUY", "label": ACTION_LABELS[a], "shares": shares, "price": p, "resp": str(resp)})
+        log.append({"sid": sid, "action": "BUY", "label": ACTION_LABELS[a], "lots": lots, "shares": shares, "price": p, "resp": str(resp)})
         state["cash_balance"] -= gross + fee
         state["inventory"][sid] = state["inventory"].get(sid, 0) + shares
     return log
@@ -197,14 +197,15 @@ def liquidate_all(prices, state, account, password, live):
             continue
         gross = held * p
         cost = gross * (TAX + FEE)
+        held_lots = held // 1000
         if live and account:
             try:
-                resp = Sell_Stock(account, password, sid, held)
+                resp = Sell_Stock(account, password, sid, held_lots, p)
             except Exception as e:
                 resp = f"ERR:{e}"
         else:
             resp = "PAPER"
-        log.append({"sid": sid, "action": "LIQUIDATE", "shares": held, "price": p, "resp": str(resp)})
+        log.append({"sid": sid, "action": "LIQUIDATE", "lots": held_lots, "shares": held, "price": p, "resp": str(resp)})
         state["cash_balance"] += gross - cost
         state["inventory"][sid] = 0
     return log
