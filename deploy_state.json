@@ -1,0 +1,273 @@
+{
+  "day_count": 1,
+  "initial_cash": 100000000,
+  "cash_balance": 890369.7449999978,
+  "inventory": {
+    "2330": 14000,
+    "2317": 15000,
+    "2454": 0,
+    "2308": 0,
+    "2382": 10000,
+    "2303": 0,
+    "5347": 131000,
+    "8046": 13000,
+    "2474": 0,
+    "2354": 30000,
+    "2376": 16000,
+    "3034": 0,
+    "3008": 0,
+    "3045": 11000,
+    "4904": 38000,
+    "2412": 22000,
+    "8454": 31000,
+    "2881": 41000,
+    "2882": 16000,
+    "2891": 0,
+    "2884": 11000,
+    "2885": 41000,
+    "2886": 6000,
+    "2887": 30000,
+    "2890": 0,
+    "2880": 18000,
+    "2892": 36000,
+    "1101": 14000,
+    "1102": 8000,
+    "1216": 1000,
+    "1301": 0,
+    "1303": 0,
+    "1326": 4000,
+    "2002": 24000,
+    "2207": 0,
+    "6505": 0,
+    "9910": 0,
+    "2603": 0,
+    "2609": 1000,
+    "2615": 0,
+    "2618": 0,
+    "2912": 0,
+    "5880": 6000,
+    "6415": 0,
+    "9921": 0,
+    "3231": 0
+  },
+  "peak_value": 100000000,
+  "halted": false,
+  "history": [
+    {
+      "date": "2026-04-30",
+      "actions": [
+        {
+          "sid": "2330",
+          "action": "BUY",
+          "label": "BUY_30",
+          "shares": 14000,
+          "price": 2135.0,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "2317",
+          "action": "BUY",
+          "label": "BUY_5",
+          "shares": 15000,
+          "price": 219.5,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "2382",
+          "action": "BUY",
+          "label": "BUY_5",
+          "shares": 10000,
+          "price": 312.5,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "5347",
+          "action": "BUY",
+          "label": "BUY_30",
+          "shares": 131000,
+          "price": 145.5,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "8046",
+          "action": "BUY",
+          "label": "BUY_30",
+          "shares": 13000,
+          "price": 1005.0,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "2354",
+          "action": "BUY",
+          "label": "BUY_5",
+          "shares": 30000,
+          "price": 51.8,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "2376",
+          "action": "BUY",
+          "label": "BUY_15",
+          "shares": 16000,
+          "price": 273.0,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "3045",
+          "action": "BUY",
+          "label": "BUY_5",
+          "shares": 11000,
+          "price": 111.5,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "4904",
+          "action": "BUY",
+          "label": "BUY_15",
+          "shares": 38000,
+          "price": 94.5,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "2412",
+          "action": "BUY",
+          "label": "BUY_15",
+          "shares": 22000,
+          "price": 136.0,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "8454",
+          "action": "BUY",
+          "label": "BUY_30",
+          "shares": 31000,
+          "price": 170.5,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "2881",
+          "action": "BUY",
+          "label": "BUY_30",
+          "shares": 41000,
+          "price": 90.0,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "2882",
+          "action": "BUY",
+          "label": "BUY_15",
+          "shares": 16000,
+          "price": 77.2,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "2884",
+          "action": "BUY",
+          "label": "BUY_5",
+          "shares": 11000,
+          "price": 31.85,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "2885",
+          "action": "BUY",
+          "label": "BUY_30",
+          "shares": 41000,
+          "price": 52.2,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "2886",
+          "action": "BUY",
+          "label": "BUY_5",
+          "shares": 6000,
+          "price": 39.1,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "2887",
+          "action": "BUY",
+          "label": "BUY_15",
+          "shares": 30000,
+          "price": 23.8,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "2880",
+          "action": "BUY",
+          "label": "BUY_15",
+          "shares": 18000,
+          "price": 32.05,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "2892",
+          "action": "BUY",
+          "label": "BUY_30",
+          "shares": 36000,
+          "price": 28.85,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "1101",
+          "action": "BUY",
+          "label": "BUY_15",
+          "shares": 14000,
+          "price": 24.5,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "1102",
+          "action": "BUY",
+          "label": "BUY_15",
+          "shares": 8000,
+          "price": 35.05,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "1216",
+          "action": "BUY",
+          "label": "BUY_5",
+          "shares": 1000,
+          "price": 69.3,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "1326",
+          "action": "BUY",
+          "label": "BUY_15",
+          "shares": 4000,
+          "price": 52.3,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "2002",
+          "action": "BUY",
+          "label": "BUY_30",
+          "shares": 24000,
+          "price": 18.75,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "2609",
+          "action": "BUY",
+          "label": "BUY_5",
+          "shares": 1000,
+          "price": 49.15,
+          "resp": "PAPER"
+        },
+        {
+          "sid": "5880",
+          "action": "BUY",
+          "label": "BUY_15",
+          "shares": 6000,
+          "price": 22.95,
+          "resp": "PAPER"
+        }
+      ],
+      "port_val_before": 100000000.0,
+      "port_val_after": 99858969.745,
+      "drawdown": 0.0
+    }
+  ]
+}
