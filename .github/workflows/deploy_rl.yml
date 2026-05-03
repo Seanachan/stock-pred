@@ -6,24 +6,28 @@ env:
 on:
   schedule:
     # 03:00 UTC = 11:00 TW (TW market 09:00-13:30). Buffer for cron jitter.
-    - cron: '0 3 * * 1-5'
+    - cron: "0 3 * * 1-5"
   workflow_dispatch:
     inputs:
       mode:
-        description: 'paper or live'
+        description: "paper or live"
         required: true
-        default: 'paper'
+        default: "paper"
         type: choice
         options:
           - paper
           - live
+
+concurrency:
+  group: deploy-rl
+  cancel-in-progress: false
 
 jobs:
   trade:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -34,7 +38,6 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@v4
         with:
-          enable-cache: true
           cache-dependency-glob: "requirements.txt"
 
       - name: Create venv (uv-managed Python 3.12)
