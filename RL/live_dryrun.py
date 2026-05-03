@@ -74,7 +74,7 @@ def build_obs(
     for sid in stock_ids:
         df = market_dfs.get(sid)
         if df is None or last_date not in df.index or len(df) < 30:
-            feats.extend([0.0] * 8)
+            feats.extend([0.0] * 12)
             last_prices[sid] = 0.0
             print(f"  [{sid}] insufficient data, zero features")
             continue
@@ -89,6 +89,10 @@ def build_obs(
                 row["bb_pos"],
                 row["atr"],
                 row["capacity_change"],
+                row.get("return_rank", 0.5),
+                row.get("rsi_14_rank", 0.5),
+                row.get("bias_20_rank", 0.5),
+                row.get("capacity_change_rank", 0.5),
             ]
         )
         last_prices[sid] = float(row["close"])
@@ -131,8 +135,8 @@ if __name__ == "__main__":
         print("Missing ACCOUNT/PASSWORD in env. Aborting.")
         sys.exit(1)
 
-    model_path = sys.argv[1] if len(sys.argv) > 1 else "ppo_trading_agent_v8_seed0"
-    norm_path = sys.argv[2] if len(sys.argv) > 2 else "vec_normalize_v8_seed0.pkl"
+    model_path = sys.argv[1] if len(sys.argv) > 1 else "ppo_deploy_final"
+    norm_path = sys.argv[2] if len(sys.argv) > 2 else "vec_normalize_deploy_final.pkl"
     today = datetime.date.today()
     start = (today - datetime.timedelta(days=120)).strftime("%Y%m%d")
     end = today.strftime("%Y%m%d")

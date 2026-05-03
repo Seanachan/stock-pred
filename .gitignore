@@ -219,3 +219,7 @@ img/
 tb_logs/
 *.pkl
 backtest_performance.xlsx
+
+# Allow deploy model artifacts (needed by GitHub Actions)
+!models/*.pkl
+!models/*.zip

@@ -253,22 +253,22 @@ class TradingEnv(gym.Env):
         )
         reward = agent_log_ret - bh_log_ret
 
-        # Drawdown penalty
+        # Drawdown penalty (deploy: weak, only big-drop insurance)
         peak = max(self.asset_history)
         drawdown = (peak - current_total_asset) / max(peak, 1)
-        reward -= 0.1 * max(drawdown - 0.1, 0)
+        reward -= 0.05 * max(drawdown - 0.15, 0)
 
         # Explicit turnover cost (helps gradient see fees directly)
         turnover_cost = step_fees / max(previous_total_asset, 1)
         reward -= turnover_cost
 
-        # Concentration penalty including cash (forces deployment)
+        # Concentration penalty including cash (B1a: weakened 0.5 -> 0.1)
         if current_total_asset > 0:
             full_weights = np.append(
                 self.inventory * next_prices, self.cash_balance
             ) / current_total_asset
             herfindahl = float(np.sum(full_weights**2))
-            reward -= 0.5 * max(herfindahl - 0.3, 0)
+            reward -= 0.1 * max(herfindahl - 0.3, 0)
 
         invalid_penalty = self._invalid_count * 0.0001
         reward -= invalid_penalty
