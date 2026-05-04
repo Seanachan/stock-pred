@@ -60,6 +60,7 @@
           "sid": "2330",
           "action": "BUY",
           "label": "BUY_30",
+          "lots": 14,
           "shares": 14000,
           "price": 2135.0,
           "resp": "PAPER"
@@ -68,6 +69,7 @@
           "sid": "2317",
           "action": "BUY",
           "label": "BUY_5",
+          "lots": 15,
           "shares": 15000,
           "price": 219.5,
           "resp": "PAPER"
@@ -76,6 +78,7 @@
           "sid": "2382",
           "action": "BUY",
           "label": "BUY_5",
+          "lots": 10,
           "shares": 10000,
           "price": 312.5,
           "resp": "PAPER"
@@ -84,6 +87,7 @@
           "sid": "5347",
           "action": "BUY",
           "label": "BUY_30",
+          "lots": 131,
           "shares": 131000,
           "price": 145.5,
           "resp": "PAPER"
@@ -92,6 +96,7 @@
           "sid": "8046",
           "action": "BUY",
           "label": "BUY_30",
+          "lots": 13,
           "shares": 13000,
           "price": 1005.0,
           "resp": "PAPER"
@@ -100,6 +105,7 @@
           "sid": "2354",
           "action": "BUY",
           "label": "BUY_5",
+          "lots": 30,
           "shares": 30000,
           "price": 51.8,
           "resp": "PAPER"
@@ -108,6 +114,7 @@
           "sid": "2376",
           "action": "BUY",
           "label": "BUY_15",
+          "lots": 16,
           "shares": 16000,
           "price": 273.0,
           "resp": "PAPER"
@@ -116,6 +123,7 @@
           "sid": "3045",
           "action": "BUY",
           "label": "BUY_5",
+          "lots": 11,
           "shares": 11000,
           "price": 111.5,
           "resp": "PAPER"
@@ -124,6 +132,7 @@
           "sid": "4904",
           "action": "BUY",
           "label": "BUY_15",
+          "lots": 38,
           "shares": 38000,
           "price": 94.5,
           "resp": "PAPER"
@@ -132,6 +141,7 @@
           "sid": "2412",
           "action": "BUY",
           "label": "BUY_15",
+          "lots": 22,
           "shares": 22000,
           "price": 136.0,
           "resp": "PAPER"
@@ -140,6 +150,7 @@
           "sid": "8454",
           "action": "BUY",
           "label": "BUY_30",
+          "lots": 31,
           "shares": 31000,
           "price": 170.5,
           "resp": "PAPER"
@@ -148,6 +159,7 @@
           "sid": "2881",
           "action": "BUY",
           "label": "BUY_30",
+          "lots": 41,
           "shares": 41000,
           "price": 90.0,
           "resp": "PAPER"
@@ -156,6 +168,7 @@
           "sid": "2882",
           "action": "BUY",
           "label": "BUY_15",
+          "lots": 16,
           "shares": 16000,
           "price": 77.2,
           "resp": "PAPER"
@@ -164,6 +177,7 @@
           "sid": "2884",
           "action": "BUY",
           "label": "BUY_5",
+          "lots": 11,
           "shares": 11000,
           "price": 31.85,
           "resp": "PAPER"
@@ -172,6 +186,7 @@
           "sid": "2885",
           "action": "BUY",
           "label": "BUY_30",
+          "lots": 41,
           "shares": 41000,
           "price": 52.2,
           "resp": "PAPER"
@@ -180,6 +195,7 @@
           "sid": "2886",
           "action": "BUY",
           "label": "BUY_5",
+          "lots": 6,
           "shares": 6000,
           "price": 39.1,
           "resp": "PAPER"
@@ -188,6 +204,7 @@
           "sid": "2887",
           "action": "BUY",
           "label": "BUY_15",
+          "lots": 30,
           "shares": 30000,
           "price": 23.8,
           "resp": "PAPER"
@@ -196,6 +213,7 @@
           "sid": "2880",
           "action": "BUY",
           "label": "BUY_15",
+          "lots": 18,
           "shares": 18000,
           "price": 32.05,
           "resp": "PAPER"
@@ -204,6 +222,7 @@
           "sid": "2892",
           "action": "BUY",
           "label": "BUY_30",
+          "lots": 36,
           "shares": 36000,
           "price": 28.85,
           "resp": "PAPER"
@@ -212,6 +231,7 @@
           "sid": "1101",
           "action": "BUY",
           "label": "BUY_15",
+          "lots": 14,
           "shares": 14000,
           "price": 24.5,
           "resp": "PAPER"
@@ -220,6 +240,7 @@
           "sid": "1102",
           "action": "BUY",
           "label": "BUY_15",
+          "lots": 8,
           "shares": 8000,
           "price": 35.05,
           "resp": "PAPER"
@@ -228,6 +249,7 @@
           "sid": "1216",
           "action": "BUY",
           "label": "BUY_5",
+          "lots": 1,
           "shares": 1000,
           "price": 69.3,
           "resp": "PAPER"
@@ -236,6 +258,7 @@
           "sid": "1326",
           "action": "BUY",
           "label": "BUY_15",
+          "lots": 4,
           "shares": 4000,
           "price": 52.3,
           "resp": "PAPER"
@@ -244,6 +267,7 @@
           "sid": "2002",
           "action": "BUY",
           "label": "BUY_30",
+          "lots": 24,
           "shares": 24000,
           "price": 18.75,
           "resp": "PAPER"
@@ -252,6 +276,7 @@
           "sid": "2609",
           "action": "BUY",
           "label": "BUY_5",
+          "lots": 1,
           "shares": 1000,
           "price": 49.15,
           "resp": "PAPER"
@@ -260,6 +285,7 @@
           "sid": "5880",
           "action": "BUY",
           "label": "BUY_15",
+          "lots": 6,
           "shares": 6000,
           "price": 22.95,
           "resp": "PAPER"

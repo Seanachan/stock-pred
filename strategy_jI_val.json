@@ -1,0 +1,15 @@
+{
+  "method": "regime_gate_x_momentum_weight",
+  "val": [
+    "20251001",
+    "20260422"
+  ],
+  "return": 0.21544933641250008,
+  "ew": 0.22355070639395877,
+  "alpha": -0.00810136998145869,
+  "max_drawdown": 0.09771898144970063,
+  "trades": 285,
+  "tx_cost": 682766.35875,
+  "bull_days": 131,
+  "total_days": 131
+}

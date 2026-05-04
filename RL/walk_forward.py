@@ -20,13 +20,28 @@ from torch import nn
 import RL.env  # noqa: F401
 from RL.constant import stock_ids
 
-FOLDS = [
-    ("20150105", "20181231", "20190101", "20191231"),
-    ("20150105", "20191231", "20200101", "20201231"),
-    ("20150105", "20201231", "20210101", "20211231"),
-    ("20150105", "20211231", "20220101", "20221231"),
-    ("20150105", "20221231", "20230101", "20231231"),
-]
+def gen_rolling_folds(
+    train_start="20150105",
+    first_val="20190101",
+    last_val_end="20231231",
+    val_months=6,
+):
+    """Rolling 6M val folds, growing train cutoff. ~10 folds 2019-2023."""
+    folds = []
+    cur = pd.Timestamp(first_val)
+    end_limit = pd.Timestamp(last_val_end)
+    while cur + pd.DateOffset(months=val_months) - pd.Timedelta(days=1) <= end_limit:
+        tr_e = (cur - pd.Timedelta(days=1)).strftime("%Y%m%d")
+        v_s = cur.strftime("%Y%m%d")
+        v_e = (
+            cur + pd.DateOffset(months=val_months) - pd.Timedelta(days=1)
+        ).strftime("%Y%m%d")
+        folds.append((train_start, tr_e, v_s, v_e))
+        cur += pd.DateOffset(months=val_months)
+    return folds
+
+
+FOLDS = gen_rolling_folds()
 
 
 def load_data(start, end):
@@ -48,7 +63,7 @@ def make_env(stock_data, eval_mode=False):
     )
 
 
-def train_fold(stock_data, fold_idx, total_timesteps=2_000_000):
+def train_fold(stock_data, fold_idx, total_timesteps=1_000_000):
     env = SubprocVecEnv([make_env(stock_data) for _ in range(8)])
     env = VecMonitor(env)
     env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=10.0, gamma=0.99)
@@ -74,10 +89,10 @@ def train_fold(stock_data, fold_idx, total_timesteps=2_000_000):
         device="cuda" if torch.cuda.is_available() else "cpu",
         tensorboard_log="./tb_logs/",
     )
-    model.learn(total_timesteps=total_timesteps, tb_log_name=f"PPO_wf_v10_fold{fold_idx}")
+    model.learn(total_timesteps=total_timesteps, tb_log_name=f"PPO_wf_b1a_fold{fold_idx}")
 
-    model_path = f"ppo_wf_v10_fold{fold_idx}"
-    norm_path = f"vec_normalize_wf_v10_fold{fold_idx}.pkl"
+    model_path = f"ppo_wf_b1a_fold{fold_idx}"
+    norm_path = f"vec_normalize_wf_b1a_fold{fold_idx}.pkl"
     model.save(model_path)
     env.save(norm_path)
     env.close()
@@ -172,6 +187,6 @@ if __name__ == "__main__":
     pos = sum(1 for a in alphas if a > 0)
     print(f"folds with positive alpha: {pos}/{len(alphas)}")
 
-    with open("walk_forward_v10_results.json", "w") as f:
+    with open("walk_forward_b1a_results.json", "w") as f:
         json.dump(results, f, indent=2, default=str)
-    print("\nSaved walk_forward_results.json")
+    print("\nSaved walk_forward_b1a_results.json")
