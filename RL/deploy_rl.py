@@ -23,6 +23,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Literal
 
 import gymnasium as gym
 import numpy as np
@@ -50,6 +51,40 @@ SELL_PCT = {0: 1.0, 1: 0.5, 2: 0.25}
 FEE = 0.001425
 TAX = 0.003
 MIN_FEE = 20
+
+
+def round_to_tick(price: float) -> float:
+    """TW limit-order tick rules."""
+    if price < 10:
+        tick = 0.01
+    elif price < 50:
+        tick = 0.05
+    elif price < 100:
+        tick = 0.1
+    elif price < 500:
+        tick = 0.5
+    elif price < 1000:
+        tick = 1.0
+    else:
+        tick = 5.0
+    return round(round(price / tick) * tick, 2)
+
+
+def submit_price(sid: str, stock_data: dict, side: Literal["BUY", "SELL"]) -> float:
+    """Pick limit price inside today's [low, high] band so order can fill.
+
+    Returns 0 if today's bar unavailable.
+    """
+    df = stock_data.get(sid)
+    if df is None or df.empty:
+        return 0.0
+    row = df.iloc[-1]
+    open_ = float(row.get("open", 0) or 0)
+    close = float(row.get("close", 0) or 0)
+    if open_ <= 0 or close <= 0:
+        return 0.0
+    price = max(open_, close) if side == "BUY" else min(open_, close)
+    return round_to_tick(price)
 
 
 def load_state() -> dict:
@@ -174,13 +209,15 @@ def normalize_obs(obs_raw: np.ndarray, norm_path: str, stock_data: dict) -> np.n
     return venv.normalize_obs(obs_raw.reshape(1, -1)).flatten().astype(np.float32)
 
 
-def execute_actions(actions, prices, state, account, password, live):
+def execute_actions(actions, stock_data, state, account, password, live):
     log = []
     # Pass 1: sells (free up cash first)
     for i, sid in enumerate(stock_ids):
         a = int(actions[i])
-        p = prices.get(sid, 0)
-        if p == 0 or a not in SELL_PCT:
+        if a not in SELL_PCT:
+            continue
+        p = submit_price(sid, stock_data, "SELL")
+        if p <= 0:
             continue
         held_lots = state["inventory"].get(sid, 0) // 1000
         sell_lots = int(held_lots * SELL_PCT[a])
@@ -203,8 +240,10 @@ def execute_actions(actions, prices, state, account, password, live):
     # Pass 2: buys
     for i, sid in enumerate(stock_ids):
         a = int(actions[i])
-        p = prices.get(sid, 0)
-        if p == 0 or a not in BUY_PCT:
+        if a not in BUY_PCT:
+            continue
+        p = submit_price(sid, stock_data, "BUY")
+        if p <= 0:
             continue
         budget = state["cash_balance"] * BUY_PCT[a]
         lots = int(budget // (p * 1000))
@@ -228,12 +267,14 @@ def execute_actions(actions, prices, state, account, password, live):
     return log
 
 
-def liquidate_all(prices, state, account, password, live):
+def liquidate_all(stock_data, state, account, password, live):
     log = []
     for sid in stock_ids:
         held = state["inventory"].get(sid, 0)
-        p = prices.get(sid, 0)
-        if held <= 0 or p == 0:
+        if held <= 0:
+            continue
+        p = submit_price(sid, stock_data, "SELL")
+        if p <= 0:
             continue
         gross = held * p
         cost = gross * (TAX + FEE)
@@ -311,7 +352,7 @@ if __name__ == "__main__":
 
     if drawdown > DRAWDOWN_STOP:
         print(f"\n!!! DRAWDOWN TRIGGER ({drawdown * 100:.2f}% > {DRAWDOWN_STOP * 100:.0f}%) — LIQUIDATING !!!")
-        log = liquidate_all(prices, state, account, password, args.live)
+        log = liquidate_all(stock_data, state, account, password, args.live)
         for item in log:
             print(f"  LIQUIDATE {item['sid']:<6} x{item['shares']:>7}  resp={item['resp']}")
         state["halted"] = True
@@ -326,7 +367,7 @@ if __name__ == "__main__":
     model = PPO.load(args.model, device="cpu")
     actions, _ = model.predict(obs, deterministic=True)
 
-    log = execute_actions(actions, prices, state, account, password, args.live)
+    log = execute_actions(actions, stock_data, state, account, password, args.live)
     print(f"\n{len(log)} actions ({'LIVE' if args.live else 'PAPER'}):")
     print(f"  {'sid':<6}{'action':<6}{'label':<10}{'shares':>8}{'price':>10}{'resp':>20}")
     for item in log:
