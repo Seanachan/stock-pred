@@ -24,6 +24,7 @@ import os
 import sys
 from pathlib import Path
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 import gymnasium as gym
 import numpy as np
@@ -85,6 +86,31 @@ def submit_price(sid: str, stock_data: dict, side: Literal["BUY", "SELL"]) -> fl
         return 0.0
     price = max(open_, close) if side == "BUY" else min(open_, close)
     return round_to_tick(price)
+
+
+def is_trading_window(now: datetime.datetime | None = None) -> tuple[bool, str]:
+    """Return (allowed, reason). Submission gated when False.
+
+    Called only on --live runs. Paper/status modes bypass this check.
+    Policy: TW cash market 09:00-13:30, Mon-Fri, evaluated in Asia/Taipei.
+    Holiday detection deferred — lab API still rejects on holidays inside the
+    window, but the success-check guard absorbs those (state stays clean).
+    """
+    tz = ZoneInfo("Asia/Taipei")
+    if now is None:
+        tw = datetime.datetime.now(tz)
+    elif now.tzinfo is None:
+        tw = now.replace(tzinfo=tz)
+    else:
+        tw = now.astimezone(tz)
+    if tw.weekday() >= 5:
+        return False, f"weekend ({tw.strftime('%a').lower()})"
+    hm = tw.hour * 60 + tw.minute
+    if hm < 9 * 60:
+        return False, f"pre-market (now {tw.strftime('%H:%M')} TW)"
+    if hm > 13 * 60 + 30:
+        return False, f"post-market (now {tw.strftime('%H:%M')} TW)"
+    return True, ""
 
 
 def load_state() -> dict:
@@ -228,14 +254,16 @@ def execute_actions(actions, stock_data, state, account, password, live):
         cost = gross * (TAX + FEE)
         if live and account:
             try:
-                resp = Sell_Stock(account, password, sid, sell_lots, p)
+                ok = bool(Sell_Stock(account, password, sid, sell_lots, p))
+                resp = "OK" if ok else "REJECTED"
             except Exception as e:
-                resp = f"ERR:{e}"
+                ok, resp = False, f"ERR:{e}"
         else:
-            resp = "PAPER"
-        log.append({"sid": sid, "action": "SELL", "label": ACTION_LABELS[a], "lots": sell_lots, "shares": shares, "price": p, "resp": str(resp)})
-        state["cash_balance"] += gross - cost
-        state["inventory"][sid] -= shares
+            ok, resp = True, "PAPER"
+        log.append({"sid": sid, "action": "SELL", "label": ACTION_LABELS[a], "lots": sell_lots, "shares": shares, "price": p, "resp": resp, "ok": ok})
+        if ok:
+            state["cash_balance"] += gross - cost
+            state["inventory"][sid] -= shares
 
     # Pass 2: buys
     for i, sid in enumerate(stock_ids):
@@ -256,14 +284,16 @@ def execute_actions(actions, stock_data, state, account, password, live):
             continue
         if live and account:
             try:
-                resp = Buy_Stock(account, password, sid, lots, p)
+                ok = bool(Buy_Stock(account, password, sid, lots, p))
+                resp = "OK" if ok else "REJECTED"
             except Exception as e:
-                resp = f"ERR:{e}"
+                ok, resp = False, f"ERR:{e}"
         else:
-            resp = "PAPER"
-        log.append({"sid": sid, "action": "BUY", "label": ACTION_LABELS[a], "lots": lots, "shares": shares, "price": p, "resp": str(resp)})
-        state["cash_balance"] -= gross + fee
-        state["inventory"][sid] = state["inventory"].get(sid, 0) + shares
+            ok, resp = True, "PAPER"
+        log.append({"sid": sid, "action": "BUY", "label": ACTION_LABELS[a], "lots": lots, "shares": shares, "price": p, "resp": resp, "ok": ok})
+        if ok:
+            state["cash_balance"] -= gross + fee
+            state["inventory"][sid] = state["inventory"].get(sid, 0) + shares
     return log
 
 
@@ -281,14 +311,16 @@ def liquidate_all(stock_data, state, account, password, live):
         held_lots = held // 1000
         if live and account:
             try:
-                resp = Sell_Stock(account, password, sid, held_lots, p)
+                ok = bool(Sell_Stock(account, password, sid, held_lots, p))
+                resp = "OK" if ok else "REJECTED"
             except Exception as e:
-                resp = f"ERR:{e}"
+                ok, resp = False, f"ERR:{e}"
         else:
-            resp = "PAPER"
-        log.append({"sid": sid, "action": "LIQUIDATE", "lots": held_lots, "shares": held, "price": p, "resp": str(resp)})
-        state["cash_balance"] += gross - cost
-        state["inventory"][sid] = 0
+            ok, resp = True, "PAPER"
+        log.append({"sid": sid, "action": "LIQUIDATE", "lots": held_lots, "shares": held, "price": p, "resp": resp, "ok": ok})
+        if ok:
+            state["cash_balance"] += gross - cost
+            state["inventory"][sid] = 0
     return log
 
 
@@ -326,6 +358,12 @@ if __name__ == "__main__":
         print("STATE: halted (drawdown stop hit prior). no actions.")
         save_state(state)
         sys.exit(0)
+
+    if args.live:
+        allowed, reason = is_trading_window()
+        if not allowed:
+            print(f"SKIP: outside trading window ({reason}). no submission today.")
+            sys.exit(0)
 
     print("\nloading data (csv preferred)...")
     stock_data = fetch_history(force_refresh=args.refresh_data)
