@@ -43,15 +43,15 @@ INITIAL_CASH = 100_000_000
 DRAWDOWN_STOP = 0.10
 HISTORY_DAYS = 180  # generous so we always cover 60d+ valid features
 
-ACTION_LABELS = {
-    0: "SELL_100", 1: "SELL_50", 2: "SELL_25", 3: "HOLD",
-    4: "BUY_5", 5: "BUY_15", 6: "BUY_30",
-}
-BUY_PCT = {4: 0.05, 5: 0.15, 6: 0.30}
-SELL_PCT = {0: 1.0, 1: 0.5, 2: 0.25}
 FEE = 0.001425
 TAX = 0.003
 MIN_FEE = 20
+
+
+def softmax(logits: np.ndarray) -> np.ndarray:
+    z = logits - np.max(logits)
+    e = np.exp(z)
+    return e / np.sum(e)
 
 
 def round_to_tick(price: float) -> float:
@@ -233,65 +233,86 @@ def normalize_obs(obs_raw: np.ndarray, norm_path: str, stock_data: dict) -> np.n
     return venv.normalize_obs(obs_raw.reshape(1, -1)).flatten().astype(np.float32)
 
 
-def execute_actions(actions, stock_data, state, account, password, live):
-    log = []
-    # Pass 1: sells (free up cash first)
-    for i, sid in enumerate(stock_ids):
-        a = int(actions[i])
-        if a not in SELL_PCT:
-            continue
-        p = submit_price(sid, stock_data, "SELL")
-        if p <= 0:
-            continue
-        held_lots = state["inventory"].get(sid, 0) // 1000
-        sell_lots = int(held_lots * SELL_PCT[a])
-        if sell_lots <= 0:
-            continue
-        shares = sell_lots * 1000
-        gross = shares * p
-        cost = gross * (TAX + FEE)
-        if live and account:
-            try:
-                ok = bool(Sell_Stock(account, password, sid, sell_lots, p))
-                resp = "OK" if ok else "REJECTED"
-            except Exception as e:
-                ok, resp = False, f"ERR:{e}"
-        else:
-            ok, resp = True, "PAPER"
-        log.append({"sid": sid, "action": "SELL", "label": ACTION_LABELS[a], "lots": sell_lots, "shares": shares, "price": p, "resp": resp, "ok": ok})
-        if ok:
-            state["cash_balance"] += gross - cost
-            state["inventory"][sid] -= shares
+def execute_actions(action_logits, prices, stock_data, state, account, password, live):
+    """Translate softmax(logits) target weights into buy/sell orders.
 
-    # Pass 2: buys
+    action_logits: shape (N+1,) — last entry is cash weight.
+    prices: {sid: float} valuation prices used to compute current portfolio value.
+    """
+    log = []
+    weights = softmax(np.asarray(action_logits, dtype=np.float64))
+    target_stock_weights = weights[: len(stock_ids)]
+
+    port_value = state["cash_balance"] + sum(
+        state["inventory"].get(sid, 0) * prices.get(sid, 0.0) for sid in stock_ids
+    )
+    if port_value <= 0:
+        return log
+
     for i, sid in enumerate(stock_ids):
-        a = int(actions[i])
-        if a not in BUY_PCT:
+        cur_shares = state["inventory"].get(sid, 0)
+        target_value = float(target_stock_weights[i]) * port_value
+        # Use submit_price for sizing so we don't oversell at a stale price.
+        # Sell side / buy side may differ — pick BUY for sizing target shares,
+        # then we'll compute delta and route.
+        sizing_p = submit_price(sid, stock_data, "BUY")
+        if sizing_p <= 0:
             continue
-        p = submit_price(sid, stock_data, "BUY")
+        target_lots = int(target_value // (sizing_p * 1000))
+        target_shares = target_lots * 1000
+        delta = target_shares - cur_shares
+        if delta == 0:
+            continue
+        side = "BUY" if delta > 0 else "SELL"
+        p = submit_price(sid, stock_data, side)
         if p <= 0:
             continue
-        budget = state["cash_balance"] * BUY_PCT[a]
-        lots = int(budget // (p * 1000))
+        lots = abs(delta) // 1000
         if lots <= 0:
             continue
         shares = lots * 1000
-        gross = shares * p
-        fee = max(gross * FEE, MIN_FEE)
-        if state["cash_balance"] < gross + fee:
-            continue
-        if live and account:
-            try:
-                ok = bool(Buy_Stock(account, password, sid, lots, p))
-                resp = "OK" if ok else "REJECTED"
-            except Exception as e:
-                ok, resp = False, f"ERR:{e}"
+
+        if side == "SELL":
+            gross = shares * p
+            cost = gross * (TAX + FEE)
+            if live and account:
+                try:
+                    ok = bool(Sell_Stock(account, password, sid, lots, p))
+                    resp = "OK" if ok else "REJECTED"
+                except Exception as e:
+                    ok, resp = False, f"ERR:{e}"
+            else:
+                ok, resp = True, "PAPER"
+            log.append({"sid": sid, "action": "SELL", "lots": lots, "shares": shares, "price": p, "weight": float(target_stock_weights[i]), "resp": resp, "ok": ok})
+            if ok:
+                state["cash_balance"] += gross - cost
+                state["inventory"][sid] -= shares
         else:
-            ok, resp = True, "PAPER"
-        log.append({"sid": sid, "action": "BUY", "label": ACTION_LABELS[a], "lots": lots, "shares": shares, "price": p, "resp": resp, "ok": ok})
-        if ok:
-            state["cash_balance"] -= gross + fee
-            state["inventory"][sid] = state["inventory"].get(sid, 0) + shares
+            gross = shares * p
+            fee = max(gross * FEE, MIN_FEE)
+            if state["cash_balance"] < gross + fee:
+                # trim to affordable
+                affordable_lots = int(
+                    max(state["cash_balance"] - MIN_FEE, 0) // (p * 1000)
+                )
+                if affordable_lots <= 0:
+                    continue
+                lots = affordable_lots
+                shares = lots * 1000
+                gross = shares * p
+                fee = max(gross * FEE, MIN_FEE)
+            if live and account:
+                try:
+                    ok = bool(Buy_Stock(account, password, sid, lots, p))
+                    resp = "OK" if ok else "REJECTED"
+                except Exception as e:
+                    ok, resp = False, f"ERR:{e}"
+            else:
+                ok, resp = True, "PAPER"
+            log.append({"sid": sid, "action": "BUY", "lots": lots, "shares": shares, "price": p, "weight": float(target_stock_weights[i]), "resp": resp, "ok": ok})
+            if ok:
+                state["cash_balance"] -= gross + fee
+                state["inventory"][sid] = state["inventory"].get(sid, 0) + shares
     return log
 
 
@@ -403,11 +424,14 @@ if __name__ == "__main__":
     model = PPO.load(args.model, device="cpu")
     actions, _ = model.predict(obs, deterministic=True)
 
-    log = execute_actions(actions, stock_data, state, account, password, args.live)
+    log = execute_actions(actions, prices, stock_data, state, account, password, args.live)
     print(f"\n{len(log)} actions ({'LIVE' if args.live else 'PAPER'}):")
-    print(f"  {'sid':<6}{'action':<6}{'label':<10}{'shares':>8}{'price':>10}{'resp':>20}")
+    print(f"  {'sid':<6}{'action':<6}{'weight':>7}{'shares':>10}{'price':>10}{'resp':>14}")
     for item in log:
-        print(f"  {item['sid']:<6}{item['action']:<6}{item['label']:<10}{item['shares']:>8}{item['price']:>10.2f}{str(item['resp'])[:20]:>20}")
+        print(
+            f"  {item['sid']:<6}{item['action']:<6}{item['weight'] * 100:>6.2f}%"
+            f"{item['shares']:>10}{item['price']:>10.2f}{str(item['resp'])[:14]:>14}"
+        )
 
     state["day_count"] += 1
     new_port = portfolio_value(prices, state)

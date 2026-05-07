@@ -27,6 +27,7 @@ from torch import nn
 
 import RL.env  # noqa: F401
 from RL.constant import stock_ids
+from RL.policy import PerAssetEncoder
 
 TRAIN_START = "20150105"
 SPLIT_TRAIN_END = "20250930"
@@ -69,7 +70,9 @@ def train(stock_data, tag, seed):
         env,
         policy_kwargs=dict(
             activation_fn=nn.ReLU,
-            net_arch=dict(pi=[512, 256], vf=[512, 256]),
+            net_arch=dict(pi=[256, 128], vf=[256, 128]),
+            features_extractor_class=PerAssetEncoder,
+            features_extractor_kwargs=dict(num_stocks=len(stock_ids)),
         ),
         learning_rate=get_linear_fn(3e-4, 1e-5, 1.0),
         n_steps=1024,
