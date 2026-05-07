@@ -19,6 +19,7 @@ from torch import nn
 
 import RL.env  # noqa: F401
 from RL.constant import stock_ids
+from RL.policy import PerAssetEncoder
 
 def gen_rolling_folds(
     train_start="20150105",
@@ -73,7 +74,9 @@ def train_fold(stock_data, fold_idx, total_timesteps=1_000_000):
         env,
         policy_kwargs=dict(
             activation_fn=nn.ReLU,
-            net_arch=dict(pi=[512, 256], vf=[512, 256]),
+            net_arch=dict(pi=[256, 128], vf=[256, 128]),
+            features_extractor_class=PerAssetEncoder,
+            features_extractor_kwargs=dict(num_stocks=len(stock_ids)),
         ),
         learning_rate=get_linear_fn(3e-4, 1e-5, 1.0),
         n_steps=1024,
@@ -89,10 +92,10 @@ def train_fold(stock_data, fold_idx, total_timesteps=1_000_000):
         device="cuda" if torch.cuda.is_available() else "cpu",
         tensorboard_log="./tb_logs/",
     )
-    model.learn(total_timesteps=total_timesteps, tb_log_name=f"PPO_wf_b1a_fold{fold_idx}")
+    model.learn(total_timesteps=total_timesteps, tb_log_name=f"PPO_wf_v2_1_fold{fold_idx}")
 
-    model_path = f"ppo_wf_b1a_fold{fold_idx}"
-    norm_path = f"vec_normalize_wf_b1a_fold{fold_idx}.pkl"
+    model_path = f"ppo_wf_v2_1_fold{fold_idx}"
+    norm_path = f"vec_normalize_wf_v2_1_fold{fold_idx}.pkl"
     model.save(model_path)
     env.save(norm_path)
     env.close()
@@ -187,6 +190,6 @@ if __name__ == "__main__":
     pos = sum(1 for a in alphas if a > 0)
     print(f"folds with positive alpha: {pos}/{len(alphas)}")
 
-    with open("walk_forward_b1a_results.json", "w") as f:
+    with open("walk_forward_v2_1_results.json", "w") as f:
         json.dump(results, f, indent=2, default=str)
-    print("\nSaved walk_forward_b1a_results.json")
+    print("\nSaved walk_forward_v2_1_results.json")

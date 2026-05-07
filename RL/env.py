@@ -68,6 +68,10 @@ class TradingEnv(gym.Env):
         )
         self.sharpe_window = 20
         self.return_history = deque(maxlen=self.sharpe_window)
+        # v2.1 turnover guards
+        self.max_pos_weight = 0.10  # cap any single stock at 10% (paper #2)
+        self.weight_deadband = 0.005  # skip rebalance under 0.5% drift
+        self.turnover_lambda = 0.1  # explicit -λ·Σ|Δw| in reward
         self.feat_per_stock = 12
         self.observation_dim = (
             (self.num_stocks * self.feat_per_stock) + 1 + self.num_stocks
@@ -187,6 +191,7 @@ class TradingEnv(gym.Env):
         previous_total_asset = self.asset_history[-1]
 
         target_weights = self._softmax(np.asarray(action, dtype=np.float64))
+        target_weights = self._cap_and_renorm(target_weights)
 
         valid = (current_prices > 0) & ~np.isnan(current_prices)
         if not valid.any():
@@ -198,6 +203,24 @@ class TradingEnv(gym.Env):
         port_value = self.cash_balance + float(
             np.sum(self.inventory[valid] * current_prices[valid])
         )
+
+        # current weights (for deadband + turnover penalty).
+        current_weights = np.zeros(self.num_stocks + 1, dtype=np.float64)
+        if port_value > 0:
+            current_weights[: self.num_stocks] = (
+                self.inventory * current_prices
+            ) / port_value
+            current_weights[self.num_stocks] = self.cash_balance / port_value
+
+        # Deadband: stocks whose target ≈ current keep their current weight.
+        weight_delta = target_weights - current_weights
+        held_mask = np.abs(weight_delta[: self.num_stocks]) < self.weight_deadband
+        target_weights[: self.num_stocks][held_mask] = current_weights[
+            : self.num_stocks
+        ][held_mask]
+
+        # Turnover after deadband (used both for reward and as info).
+        turnover = float(np.sum(np.abs(target_weights - current_weights)))
 
         target_stock_value = port_value * target_weights[: self.num_stocks]
         target_stock_value[~valid] = 0.0
@@ -270,6 +293,9 @@ class TradingEnv(gym.Env):
         else:
             reward = step_ret * 100.0
 
+        # v2.1: explicit turnover penalty so PPO sees churn cost directly.
+        reward -= self.turnover_lambda * turnover
+
         self.asset_history.append(current_total_asset)
 
         info = {
@@ -278,6 +304,7 @@ class TradingEnv(gym.Env):
             "total_fees": step_fees,
             "return_rate": (current_total_asset / self.initial_cash) - 1,
             "step_return": step_ret,
+            "turnover": turnover,
             "inventory": {
                 code: int(inv) for code, inv in zip(self.stock_ids, self.inventory)
             },
@@ -299,6 +326,21 @@ class TradingEnv(gym.Env):
         z = logits - np.max(logits)
         e = np.exp(z)
         return e / np.sum(e)
+
+    def _cap_and_renorm(self, weights: np.ndarray) -> np.ndarray:
+        """Clip per-stock weight to max_pos_weight; excess goes to cash slot.
+
+        Cash (last entry) keeps any excess so weights still sum to 1. If after
+        capping the stock weights already exceed 1 (impossible after softmax),
+        renormalize the stock block.
+        """
+        N = self.num_stocks
+        capped = weights.copy()
+        cap = self.max_pos_weight
+        excess = float(np.sum(np.maximum(capped[:N] - cap, 0.0)))
+        capped[:N] = np.minimum(capped[:N], cap)
+        capped[N] = capped[N] + excess
+        return capped
 
     def _terminate_step(self, total_asset, prices, trades, fees):
         info = {
