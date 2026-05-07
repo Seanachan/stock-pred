@@ -92,9 +92,9 @@ def is_trading_window(now: datetime.datetime | None = None) -> tuple[bool, str]:
     """Return (allowed, reason). Submission gated when False.
 
     Called only on --live runs. Paper/status modes bypass this check.
-    Policy: TW cash market 09:00-13:30, Mon-Fri, evaluated in Asia/Taipei.
-    Holiday detection deferred — lab API still rejects on holidays inside the
-    window, but the success-check guard absorbs those (state stays clean).
+    Policy per lab API rules: orders accepted only 16:01–next-day 08:59,
+    Mon-Fri (Asia/Taipei). 09:00–16:00 is blocked (TW market open +
+    15:30 settlement matching). Weekends blocked (no settlement).
     """
     tz = ZoneInfo("Asia/Taipei")
     if now is None:
@@ -106,10 +106,8 @@ def is_trading_window(now: datetime.datetime | None = None) -> tuple[bool, str]:
     if tw.weekday() >= 5:
         return False, f"weekend ({tw.strftime('%a').lower()})"
     hm = tw.hour * 60 + tw.minute
-    if hm < 9 * 60:
-        return False, f"pre-market (now {tw.strftime('%H:%M')} TW)"
-    if hm > 13 * 60 + 30:
-        return False, f"post-market (now {tw.strftime('%H:%M')} TW)"
+    if 9 * 60 <= hm <= 16 * 60:
+        return False, f"market/settlement hours (now {tw.strftime('%H:%M')} TW, allowed 16:01-08:59)"
     return True, ""
 
 
