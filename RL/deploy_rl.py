@@ -29,12 +29,14 @@ from zoneinfo import ZoneInfo
 import gymnasium as gym
 import numpy as np
 import pandas as pd
+import torch
 from dotenv import load_dotenv
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 import RL.env  # noqa: F401  registers TradingEnv-v0
 from RL.constant import stock_ids
+from RL.dl_portfolio import PortfolioNetLSTM
 from RL.feature import FeatureExtractor
 from stock_api import Buy_Stock, Get_User_Stocks, Sell_Stock, get_taiwan_stock_data
 
@@ -348,10 +350,67 @@ def portfolio_value(prices, state) -> float:
     return state["cash_balance"] + inv_val
 
 
+def predict_dl_weights(checkpoint_path: str, stock_data: dict, obs_date) -> np.ndarray:
+    """Load v4 LSTM checkpoint, build (1, N, L, F) input from latest CSVs,
+    return target portfolio weights as a (N+1,) numpy array (sums to 1).
+    """
+    ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    cfg = ckpt["config"]
+    saved_ids = ckpt["stock_ids"]
+    feat_cols = ckpt["feat_cols"]
+    L = cfg["window_len"]
+    F = cfg["feat_per_stock"]
+    N = cfg["num_stocks"]
+
+    if saved_ids != stock_ids:
+        raise RuntimeError(
+            f"stock_ids order changed since training "
+            f"({len(saved_ids)} → {len(stock_ids)}); retrain or align."
+        )
+
+    fe = FeatureExtractor(stock_ids)
+    market_dfs = fe.extract_features(stock_data)
+
+    feats = np.zeros((1, N, L, F), dtype=np.float32)
+    mask = np.zeros((1, N), dtype=bool)
+    for j, sid in enumerate(stock_ids):
+        df = market_dfs.get(sid)
+        if df is None or df.empty:
+            continue
+        sub = df[df.index <= obs_date].tail(L)
+        if len(sub) < L:
+            continue
+        for k, c in enumerate(feat_cols):
+            if c in sub.columns:
+                feats[0, j, :, k] = sub[c].fillna(0.0).to_numpy(dtype=np.float32)
+        mask[0, j] = True
+    feats = np.nan_to_num(feats, nan=0.0, posinf=1.0, neginf=-1.0)
+
+    net = PortfolioNetLSTM(
+        num_stocks=N,
+        feat_per_stock=F,
+        window_len=L,
+        hidden=cfg["hidden"],
+        max_weight=cfg["max_weight"],
+        use_sparsemax=cfg.get("use_sparsemax", False),
+    )
+    net.load_state_dict(ckpt["state_dict"])
+    net.eval()
+
+    with torch.no_grad():
+        weights = net(torch.from_numpy(feats), torch.from_numpy(mask)).numpy()[0]
+    print(f"  v4 weights: max stock={weights[:N].max():.4f}, "
+          f"cash={weights[N]:.4f}, active={int((weights[:N] > 0.005).sum())}")
+    return weights
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="models/ppo_deploy_final")
     parser.add_argument("--norm", default="models/vec_normalize_deploy_final.pkl")
+    parser.add_argument("--dl-model", default=None,
+                        help="path to v4 LSTM checkpoint (.pt). When set, "
+                             "PPO model/norm are ignored.")
     parser.add_argument("--paper", action="store_true")
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--status", action="store_true")
@@ -371,7 +430,9 @@ if __name__ == "__main__":
         sys.exit(0)
 
     print(f"=== Deploy RL day {state['day_count'] + 1} ({datetime.date.today()}) ===")
-    print(f"model: {args.model}  mode: {'LIVE' if args.live else 'PAPER'}")
+    model_label = args.dl_model if args.dl_model else args.model
+    arch = "v4-LSTM" if args.dl_model else "PPO"
+    print(f"model: {model_label} [{arch}]  mode: {'LIVE' if args.live else 'PAPER'}")
 
     if state["halted"]:
         print("STATE: halted (drawdown stop hit prior). no actions.")
@@ -419,10 +480,17 @@ if __name__ == "__main__":
         print(f"\nstate saved: HALTED at day {state['day_count']}")
         sys.exit(0)
 
-    print("\nnormalizing obs + predicting...")
-    obs = normalize_obs(obs_raw, args.norm, stock_data)
-    model = PPO.load(args.model, device="cpu")
-    actions, _ = model.predict(obs, deterministic=True)
+    if args.dl_model:
+        print("\nrunning v4 LSTM inference...")
+        weights = predict_dl_weights(args.dl_model, stock_data, obs_date)
+        # already softmaxed + capped; reuse softmax-shape input by passing
+        # log-weights so downstream softmax is identity-up-to-shift.
+        actions = np.log(np.clip(weights, 1e-12, 1.0))
+    else:
+        print("\nnormalizing obs + predicting...")
+        obs = normalize_obs(obs_raw, args.norm, stock_data)
+        model = PPO.load(args.model, device="cpu")
+        actions, _ = model.predict(obs, deterministic=True)
 
     log = execute_actions(actions, prices, stock_data, state, account, password, args.live)
     print(f"\n{len(log)} actions ({'LIVE' if args.live else 'PAPER'}):")
