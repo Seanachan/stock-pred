@@ -350,6 +350,57 @@ def portfolio_value(prices, state) -> float:
     return state["cash_balance"] + inv_val
 
 
+def parse_broker_inventory(resp) -> dict:
+    """Convert Get_User_Stocks response into {stock_id: total_shares}.
+
+    The lab API has returned varying shapes (list, dict, dict-with-stocks-key),
+    so we accept any of them. Unknown stock codes are dropped.
+    """
+    inv = {sid: 0 for sid in stock_ids}
+    if not resp:
+        return inv
+    if isinstance(resp, dict):
+        items = resp["stocks"] if "stocks" in resp else list(resp.values())
+    elif isinstance(resp, list):
+        items = resp
+    else:
+        items = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        sid = str(item.get("stock_code") or item.get("stock_id") or "")
+        shares = int(item.get("shares") or item.get("stock_shares") or 0)
+        if sid in inv:
+            inv[sid] += shares
+    return inv
+
+
+def reconcile_inventory(state: dict, account: str, password: str) -> int:
+    """Overwrite state['inventory'] with broker truth. Cash is not touched —
+    the lab API does not expose it. Returns the number of stocks whose
+    local count differed from broker.
+
+    The success-check guard added to execute_actions/liquidate_all prevents
+    future drift, so this is mostly a one-time cleanup of legacy drift left
+    over from the pre-guard PPO runs. Safe to call every day.
+    """
+    try:
+        raw = Get_User_Stocks(account, password)
+    except Exception as e:
+        print(f"  RECONCILE skipped (broker err: {e})")
+        return -1
+    broker = parse_broker_inventory(raw)
+    mismatches = 0
+    for sid in stock_ids:
+        loc = int(state["inventory"].get(sid, 0))
+        brk = int(broker.get(sid, 0))
+        if loc != brk:
+            print(f"  RECONCILE {sid}: local {loc} -> broker {brk}")
+            state["inventory"][sid] = brk
+            mismatches += 1
+    return mismatches
+
+
 def predict_dl_weights(checkpoint_path: str, stock_data: dict, obs_date) -> np.ndarray:
     """Load v4 LSTM checkpoint, build (1, N, L, F) input from latest CSVs,
     return target portfolio weights as a (N+1,) numpy array (sums to 1).
@@ -416,6 +467,10 @@ if __name__ == "__main__":
     parser.add_argument("--status", action="store_true")
     parser.add_argument("--refresh-data", action="store_true",
                         help="force-refresh all CSVs from TWSE before predicting")
+    parser.add_argument("--no-reconcile", action="store_true",
+                        help="skip Get_User_Stocks reconcile step in --live mode")
+    parser.add_argument("--reconcile-only", action="store_true",
+                        help="only run broker reconcile, then exit")
     args = parser.parse_args()
 
     state = load_state()
@@ -427,6 +482,20 @@ if __name__ == "__main__":
         print(f"halted      : {state['halted']}")
         n_held = sum(1 for v in state["inventory"].values() if v > 0)
         print(f"holdings    : {n_held}/{len(stock_ids)} stocks")
+        sys.exit(0)
+
+    if args.reconcile_only:
+        load_dotenv()
+        account = os.getenv("ACCOUNT")
+        password = os.getenv("PASSWORD")
+        if not account or not password:
+            print("ERROR: ACCOUNT/PASSWORD env vars required for reconcile")
+            sys.exit(1)
+        print("reconciling inventory with broker...")
+        n = reconcile_inventory(state, account, password)
+        if n >= 0:
+            print(f"  {n} mismatch(es) corrected")
+            save_state(state)
         sys.exit(0)
 
     print(f"=== Deploy RL day {state['day_count'] + 1} ({datetime.date.today()}) ===")
@@ -455,18 +524,24 @@ if __name__ == "__main__":
     obs_raw, prices, obs_date = build_obs(stock_data, state)
     print(f"obs date: {obs_date.date()}, {sum(1 for p in prices.values() if p > 0)} prices")
 
-    port_val = portfolio_value(prices, state)
-    state["peak_value"] = max(state["peak_value"], port_val)
-    drawdown = (state["peak_value"] - port_val) / max(state["peak_value"], 1)
-    pnl = (port_val / state["initial_cash"] - 1) * 100
-    print(f"portfolio   : {port_val:,.0f}  PnL: {pnl:+.2f}%  drawdown: {drawdown * 100:.2f}%")
-
     load_dotenv()
     account = os.getenv("ACCOUNT") if args.live else None
     password = os.getenv("PASSWORD") if args.live else None
     if args.live and (not account or not password):
         print("ERROR: ACCOUNT/PASSWORD missing for --live")
         sys.exit(1)
+
+    if args.live and account and not args.no_reconcile:
+        print("\nreconciling inventory with broker...")
+        n = reconcile_inventory(state, account, password)
+        if n >= 0:
+            print(f"  {n} mismatch(es) corrected")
+
+    port_val = portfolio_value(prices, state)
+    state["peak_value"] = max(state["peak_value"], port_val)
+    drawdown = (state["peak_value"] - port_val) / max(state["peak_value"], 1)
+    pnl = (port_val / state["initial_cash"] - 1) * 100
+    print(f"portfolio   : {port_val:,.0f}  PnL: {pnl:+.2f}%  drawdown: {drawdown * 100:.2f}%")
 
     if drawdown > DRAWDOWN_STOP:
         print(f"\n!!! DRAWDOWN TRIGGER ({drawdown * 100:.2f}% > {DRAWDOWN_STOP * 100:.0f}%) — LIQUIDATING !!!")
