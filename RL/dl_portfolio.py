@@ -152,6 +152,76 @@ class PortfolioNet(nn.Module):
         return torch.cat([capped, cash + excess], dim=1)
 
 
+class PortfolioNetLSTM(nn.Module):
+    """v4: per-asset shared LSTM over an L-day window, then score head.
+
+    Input shape:  feats (T, N, L, F)  — for each prediction day t (= 0..T-1)
+                                        the L-day rolling window of features
+                                        ending at day t.
+    Output:       weights (T, N+1)    — softmax/sparsemax over stocks + cash.
+
+    The LSTM is shared across all stocks (permutation-equivariant). Hidden
+    state at the last timestep of the window is the per-stock embedding.
+    """
+
+    def __init__(self, num_stocks: int, feat_per_stock: int = 12,
+                 window_len: int = 50, hidden: int = 64, max_weight: float = 0.10,
+                 use_sparsemax: bool = False):
+        super().__init__()
+        self.N = num_stocks
+        self.F = feat_per_stock
+        self.L = window_len
+        self.max_weight = max_weight
+        self.use_sparsemax = use_sparsemax
+
+        self.lstm = nn.LSTM(feat_per_stock, hidden, batch_first=True)
+        self.head = nn.Linear(hidden, 1)
+        self.cash_logit = nn.Parameter(torch.zeros(1))
+
+    def forward(self, feats: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
+        T, N, L, F = feats.shape
+        x = feats.reshape(T * N, L, F)
+        out, _ = self.lstm(x)
+        last = out[:, -1, :]
+        scores = self.head(last).squeeze(-1).reshape(T, N)
+        if mask is not None:
+            scores = scores.masked_fill(~mask, -1e6)
+        cash = self.cash_logit.expand(T, 1)
+        logits = torch.cat([scores, cash], dim=1)
+        weights = sparsemax(logits, dim=1) if self.use_sparsemax else torch.softmax(logits, dim=1)
+        if self.max_weight is not None and self.max_weight < 1.0:
+            weights = self._cap_renorm(weights)
+        return weights
+
+    def _cap_renorm(self, w: torch.Tensor) -> torch.Tensor:
+        N = self.N
+        stock = w[:, :N]
+        cash = w[:, N:]
+        capped = torch.clamp(stock, max=self.max_weight)
+        excess = (stock - capped).sum(dim=1, keepdim=True)
+        return torch.cat([capped, cash + excess], dim=1)
+
+
+def windowize(feats: torch.Tensor, rets: torch.Tensor, mask: torch.Tensor,
+              window_len: int):
+    """Slide an L-day window over (T, N, F)/(T, N) tensors.
+
+    Returns:
+      feats_x  (T-L, N, L, F): window i covers feats[i..i+L-1]; predicts day i+L
+      rets_y   (T-L, N):      asset returns at day i+L
+      mask_x   (T-L, N):      mask at day i+L-1 (last day visible to model)
+    """
+    L = window_len
+    T = feats.shape[0]
+    if T < L + 2:
+        raise ValueError(f"need at least L+2={L + 2} days, got {T}")
+    feats_win = feats.unfold(0, L, 1).permute(0, 1, 3, 2).contiguous()
+    feats_x = feats_win[:-1]
+    rets_y = rets[L:]
+    mask_x = mask[L - 1 : -1]
+    return feats_x, rets_y, mask_x
+
+
 def realized_returns(weights: torch.Tensor, asset_rets: torch.Tensor,
                      tx_cost: float = 0.0042) -> torch.Tensor:
     """Sequential portfolio return series with L1 turnover cost.
@@ -271,6 +341,143 @@ def train_one_fold(
         for df in val_data.values()
         if len(df) > 1
     ) / max(1, len(val_data))
+
+    return {
+        "return": ret,
+        "ew": ew_ret,
+        "alpha": ret - ew_ret,
+        "val_sharpe": sharpe_v,
+        "best_train_sharpe": best_sharpe,
+        "active_stocks_avg": active,
+        "cash_weight_avg": float(avg_w[-1]),
+        "stock_weights_avg": [float(x) for x in avg_w[:-1]],
+    }
+
+
+def train_one_fold_lstm(
+    train_data,
+    val_data_with_prefix,
+    val_actual_start: str,
+    feature_extractor,
+    stock_ids,
+    *,
+    epochs: int = 300,
+    lr: float = 1e-3,
+    weight_decay: float = 1e-5,
+    window_len: int = 50,
+    hidden: int = 64,
+    max_weight: float = 0.10,
+    tx_cost: float = 0.0042,
+    use_sparsemax: bool = False,
+    entropy_lambda: float = 0.0,
+    train_recent_days: int = 500,
+    device: str = "cpu",
+    log_every: int = 50,
+    seed: int = 0,
+) -> dict:
+    """v4: LSTM encoder over L-day window. Otherwise mirrors train_one_fold.
+
+    val_data_with_prefix should contain at least window_len trading days
+    *before* val_actual_start so the model has full warmup. EW baseline is
+    still computed on the actual val window only (val_actual_start..end).
+    """
+    import pandas as pd
+
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
+    tr = build_tensors(train_data, feature_extractor, stock_ids, device=device)
+    va = build_tensors(val_data_with_prefix, feature_extractor, stock_ids, device=device)
+
+    net = PortfolioNetLSTM(
+        num_stocks=len(stock_ids),
+        feat_per_stock=tr["feats"].shape[-1],
+        window_len=window_len,
+        hidden=hidden,
+        max_weight=max_weight,
+        use_sparsemax=use_sparsemax,
+    ).to(device)
+    opt = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
+
+    feats_x, rets_y, mask_x = windowize(
+        tr["feats"], tr["rets"], tr["mask"], window_len
+    )
+    # Truncate to most recent N days so single-pass Sharpe fits in GPU memory.
+    # Older history's regime is largely irrelevant for next-period portfolio
+    # prediction; recency dominates signal value.
+    if train_recent_days and feats_x.shape[0] > train_recent_days:
+        feats_x = feats_x[-train_recent_days:]
+        rets_y = rets_y[-train_recent_days:]
+        mask_x = mask_x[-train_recent_days:]
+
+    best_sharpe = -math.inf
+    for epoch in range(epochs):
+        net.train()
+        weights = net(feats_x, mask_x)
+        pnl = realized_returns(weights, rets_y, tx_cost=tx_cost)
+        loss = sharpe_loss(pnl)
+        if entropy_lambda > 0:
+            loss = loss + entropy_lambda * entropy_penalty(weights)
+        opt.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(net.parameters(), 1.0)
+        opt.step()
+        with torch.no_grad():
+            sharpe = -loss.item() if entropy_lambda == 0 else float(
+                pnl.mean() / (pnl.std() + 1e-6)
+            )
+            best_sharpe = max(best_sharpe, sharpe)
+            if (epoch + 1) % log_every == 0:
+                print(
+                    f"  epoch {epoch + 1:>4}  sharpe={sharpe:+.3f}  "
+                    f"μ={pnl.mean().item() * 100:+.3f}%  "
+                    f"σ={pnl.std().item() * 100:.3f}%"
+                )
+
+    net.eval()
+    with torch.no_grad():
+        feats_v_x, rets_v_y, mask_v_x = windowize(
+            va["feats"], va["rets"], va["mask"], window_len
+        )
+        # Slice to actual val window (drop the prefix days).
+        val_dates = va["dates"]
+        val_start_ts = pd.Timestamp(val_actual_start)
+        # rets_v_y[i] corresponds to date val_dates[window_len + i]
+        first_idx = next(
+            (i for i in range(len(rets_v_y))
+             if val_dates[window_len + i] >= val_start_ts),
+            len(rets_v_y),
+        )
+        feats_v_x = feats_v_x[first_idx:]
+        rets_v_y = rets_v_y[first_idx:]
+        mask_v_x = mask_v_x[first_idx:]
+        if feats_v_x.shape[0] < 2:
+            raise RuntimeError("val window too short after prefix trim")
+
+        # Chunked eval forward to mirror training memory profile.
+        T_val = feats_v_x.shape[0]
+        eval_chunk = 128
+        weights_chunks = []
+        for s in range(0, T_val, eval_chunk):
+            e = min(s + eval_chunk, T_val)
+            weights_chunks.append(net(feats_v_x[s:e], mask_v_x[s:e]))
+        weights_v = torch.cat(weights_chunks, dim=0)
+        pnl_v = realized_returns(weights_v, rets_v_y, tx_cost=tx_cost)
+        cum = (1 + pnl_v).cumprod(0)
+        ret = float(cum[-1].item() - 1)
+        sharpe_v = float(pnl_v.mean() / (pnl_v.std() + 1e-9))
+        avg_w = weights_v.mean(dim=0).cpu().numpy()
+        active = (weights_v[:, : len(stock_ids)] > 0.005).sum(dim=1).float().mean().item()
+
+    # EW baseline: simple-average buy-and-hold over actual val window.
+    val_only = {
+        sid: df.loc[val_actual_start:]
+        for sid, df in val_data_with_prefix.items()
+        if len(df.loc[val_actual_start:]) > 1
+    }
+    ew_ret = sum(
+        (df["close"].iloc[-1] / df["close"].iloc[0] - 1) for df in val_only.values()
+    ) / max(1, len(val_only))
 
     return {
         "return": ret,

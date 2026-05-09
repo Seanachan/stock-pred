@@ -9,7 +9,7 @@ import pandas as pd
 import torch
 
 from RL.constant import stock_ids
-from RL.dl_portfolio import train_one_fold
+from RL.dl_portfolio import train_one_fold, train_one_fold_lstm
 from RL.feature import FeatureExtractor
 
 
@@ -57,6 +57,11 @@ if __name__ == "__main__":
     parser.add_argument("--max-weight", type=float, default=0.10)
     parser.add_argument("--sparsemax", action="store_true")
     parser.add_argument("--entropy-lambda", type=float, default=0.0)
+    parser.add_argument("--lstm", action="store_true",
+                        help="use LSTM encoder over --window days")
+    parser.add_argument("--window", type=int, default=50)
+    parser.add_argument("--hidden", type=int, default=64)
+    parser.add_argument("--train-recent", type=int, default=500)
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -71,28 +76,56 @@ if __name__ == "__main__":
         print(f"{'=' * 70}")
 
         train_data = load_data(tr_s, tr_e)
-        val_data = load_data(val_s, val_e)
+        if args.lstm:
+            # Need ~window trading days of warmup before val_s; fetch ~2× cal days.
+            prefix = (
+                pd.Timestamp(val_s) - pd.Timedelta(days=args.window * 2)
+            ).strftime("%Y%m%d")
+            val_data = load_data(prefix, val_e)
+        else:
+            val_data = load_data(val_s, val_e)
         if not train_data or not val_data:
             print("  no data, skip")
             continue
 
-        out = train_one_fold(
-            train_data,
-            val_data,
-            feature_extractor=fe,
-            stock_ids=stock_ids,
-            epochs=args.epochs,
-            lr=1e-3,
-            hidden=64,
-            emb=32,
-            max_weight=args.max_weight,
-            tx_cost=0.0042,
-            use_sparsemax=args.sparsemax,
-            entropy_lambda=args.entropy_lambda,
-            device=device,
-            log_every=50,
-            seed=i,
-        )
+        if args.lstm:
+            out = train_one_fold_lstm(
+                train_data,
+                val_data,
+                val_actual_start=val_s,
+                feature_extractor=fe,
+                stock_ids=stock_ids,
+                epochs=args.epochs,
+                lr=1e-3,
+                window_len=args.window,
+                hidden=args.hidden,
+                max_weight=args.max_weight,
+                tx_cost=0.0042,
+                use_sparsemax=args.sparsemax,
+                entropy_lambda=args.entropy_lambda,
+                train_recent_days=args.train_recent,
+                device=device,
+                log_every=50,
+                seed=i,
+            )
+        else:
+            out = train_one_fold(
+                train_data,
+                val_data,
+                feature_extractor=fe,
+                stock_ids=stock_ids,
+                epochs=args.epochs,
+                lr=1e-3,
+                hidden=64,
+                emb=32,
+                max_weight=args.max_weight,
+                tx_cost=0.0042,
+                use_sparsemax=args.sparsemax,
+                entropy_lambda=args.entropy_lambda,
+                device=device,
+                log_every=50,
+                seed=i,
+            )
         out["fold"] = i
         out["train"] = (tr_s, tr_e)
         out["val"] = (val_s, val_e)
