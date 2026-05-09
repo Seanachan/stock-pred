@@ -1,5 +1,6 @@
-"""Walk-forward eval for the supervised DL portfolio (v3)."""
+"""Walk-forward eval for the supervised DL portfolio (v3 / v3.1)."""
 
+import argparse
 import json
 import os
 
@@ -50,8 +51,17 @@ def load_data(start, end):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tag", default="v3")
+    parser.add_argument("--epochs", type=int, default=300)
+    parser.add_argument("--max-weight", type=float, default=0.10)
+    parser.add_argument("--sparsemax", action="store_true")
+    parser.add_argument("--entropy-lambda", type=float, default=0.0)
+    args = parser.parse_args()
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"device: {device}")
+    print(f"device: {device}  tag: {args.tag}  cap: {args.max_weight}  "
+          f"sparsemax: {args.sparsemax}  entropy_λ: {args.entropy_lambda}")
     fe = FeatureExtractor(stock_ids)
 
     results = []
@@ -71,12 +81,14 @@ if __name__ == "__main__":
             val_data,
             feature_extractor=fe,
             stock_ids=stock_ids,
-            epochs=300,
+            epochs=args.epochs,
             lr=1e-3,
             hidden=64,
             emb=32,
-            max_weight=0.10,
+            max_weight=args.max_weight,
             tx_cost=0.0042,
+            use_sparsemax=args.sparsemax,
+            entropy_lambda=args.entropy_lambda,
             device=device,
             log_every=50,
             seed=i,
@@ -118,7 +130,7 @@ if __name__ == "__main__":
     print(f"std alpha:   {np.std(alphas) * 100:.2f}%")
     print(f"folds with positive alpha: {sum(1 for a in alphas if a > 0)}/{len(alphas)}")
 
-    out_fp = "walk_forward_v3_results.json"
+    out_fp = f"walk_forward_{args.tag}_results.json"
     with open(out_fp, "w") as f:
         json.dump(
             [

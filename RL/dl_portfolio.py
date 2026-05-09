@@ -74,21 +74,46 @@ def build_tensors(stock_data, feature_extractor, stock_ids, device="cpu"):
     }
 
 
+def sparsemax(z: torch.Tensor, dim: int = -1) -> torch.Tensor:
+    """Closed-form sparse projection onto the simplex (Martins & Astudillo 2016).
+
+    Same shape as input, sums to 1 along `dim`, with explicit zeros where
+    softmax would have left tiny tails. Differentiable subgradient.
+    """
+    z = z - z.max(dim=dim, keepdim=True).values
+    sorted_z, _ = torch.sort(z, dim=dim, descending=True)
+    K = z.shape[dim]
+    rng = torch.arange(1, K + 1, device=z.device, dtype=z.dtype)
+    rng_shape = [1] * z.ndim
+    rng_shape[dim] = K
+    rng = rng.view(rng_shape)
+    cumsum = torch.cumsum(sorted_z, dim=dim)
+    cond = 1 + rng * sorted_z > cumsum
+    k = cond.to(z.dtype).sum(dim=dim, keepdim=True)
+    cumsum_k = cumsum.gather(dim, k.long() - 1)
+    tau = (cumsum_k - 1) / k
+    return torch.clamp(z - tau, min=0)
+
+
 class PortfolioNet(nn.Module):
-    """Per-asset shared encoder → score → softmax over (N+1) weights.
+    """Per-asset shared encoder → score → softmax/sparsemax over (N+1) weights.
 
     The shared encoder is permutation-equivariant: any stock with the same
     feature vector gets the same score, which is what we want for portfolio
     construction — the model must learn from features, not slot identity.
-    A learned scalar `cash_logit` competes with stock scores in the softmax.
+    A learned scalar `cash_logit` competes with stock scores.
+
+    Set `use_sparsemax=True` for explicit zero weights on most stocks (v3.1
+    sparsity path); softmax (default) gives a smooth distribution.
     """
 
     def __init__(self, num_stocks: int, feat_per_stock: int = 12, hidden: int = 64,
-                 emb: int = 32, max_weight: float = 0.10):
+                 emb: int = 32, max_weight: float = 0.10, use_sparsemax: bool = False):
         super().__init__()
         self.N = num_stocks
         self.F = feat_per_stock
         self.max_weight = max_weight
+        self.use_sparsemax = use_sparsemax
 
         self.shared = nn.Sequential(
             nn.Linear(feat_per_stock, hidden),
@@ -102,8 +127,8 @@ class PortfolioNet(nn.Module):
     def forward(self, feats: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
         """feats: (T, N, F) → weights (T, N+1) summing to 1.
 
-        Stocks with mask=False get a very negative logit so softmax kills
-        them (no allocation to delisted / pre-IPO stocks).
+        Stocks with mask=False get a very negative logit so the projection
+        kills them (no allocation to delisted / pre-IPO stocks).
         """
         emb = self.shared(feats)
         scores = self.head(emb).squeeze(-1)
@@ -112,7 +137,7 @@ class PortfolioNet(nn.Module):
         T = feats.shape[0]
         cash = self.cash_logit.expand(T, 1)
         logits = torch.cat([scores, cash], dim=1)
-        weights = torch.softmax(logits, dim=1)
+        weights = sparsemax(logits, dim=1) if self.use_sparsemax else torch.softmax(logits, dim=1)
         if self.max_weight is not None and self.max_weight < 1.0:
             weights = self._cap_renorm(weights)
         return weights
@@ -155,6 +180,14 @@ def sharpe_loss(pnl: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
     return -(pnl.mean() / (pnl.std() + eps))
 
 
+def entropy_penalty(weights: torch.Tensor, eps: float = 1e-9) -> torch.Tensor:
+    """Average entropy of the weight distribution. Add to loss to push sparser.
+
+    H(p) = -Σ p log p. EW over 47 ≈ log(47) ≈ 3.85. Concentrated 1-hot ≈ 0.
+    """
+    return -(weights * (weights + eps).log()).sum(dim=-1).mean()
+
+
 def train_one_fold(
     train_data,
     val_data,
@@ -168,6 +201,8 @@ def train_one_fold(
     emb: int = 32,
     max_weight: float = 0.10,
     tx_cost: float = 0.0042,
+    use_sparsemax: bool = False,
+    entropy_lambda: float = 0.0,
     device: str = "cpu",
     log_every: int = 25,
     seed: int = 0,
@@ -185,6 +220,7 @@ def train_one_fold(
         hidden=hidden,
         emb=emb,
         max_weight=max_weight,
+        use_sparsemax=use_sparsemax,
     ).to(device)
     opt = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -199,6 +235,8 @@ def train_one_fold(
         weights = net(feats_x, mask_x)
         pnl = realized_returns(weights, rets_y, tx_cost=tx_cost)
         loss = sharpe_loss(pnl)
+        if entropy_lambda > 0:
+            loss = loss + entropy_lambda * entropy_penalty(weights)
         opt.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), 1.0)
