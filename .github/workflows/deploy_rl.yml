@@ -5,8 +5,9 @@ env:
 
 on:
   schedule:
-    # 03:00 UTC = 11:00 TW (TW market 09:00-13:30). Buffer for cron jitter.
-    - cron: "0 3 * * 1-5"
+    # 09:00 UTC = 17:00 TW. Lab API accepts orders 16:01–next-day 08:59 only,
+    # so we run after market close + settlement window.
+    - cron: "0 9 * * 1-5"
   workflow_dispatch:
     inputs:
       mode:
@@ -52,10 +53,11 @@ jobs:
           PASSWORD: ${{ secrets.NCKU_PASSWORD }}
         run: |
           MODE="${{ github.event.inputs.mode || 'live' }}"
+          MODEL="--dl-model models/dl_v4_deploy.pt"
           if [ "$MODE" = "live" ]; then
-            uv run python -m RL.deploy_rl --live
+            uv run python -m RL.deploy_rl --live $MODEL
           else
-            uv run python -m RL.deploy_rl --paper
+            uv run python -m RL.deploy_rl --paper $MODEL
           fi
 
       - name: Commit state + refreshed CSVs
