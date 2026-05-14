@@ -109,7 +109,10 @@ def is_trading_window(now: datetime.datetime | None = None) -> tuple[bool, str]:
         return False, f"weekend ({tw.strftime('%a').lower()})"
     hm = tw.hour * 60 + tw.minute
     if 9 * 60 <= hm <= 16 * 60:
-        return False, f"market/settlement hours (now {tw.strftime('%H:%M')} TW, allowed 16:01-08:59)"
+        return (
+            False,
+            f"market/settlement hours (now {tw.strftime('%H:%M')} TW, allowed 16:01-08:59)",
+        )
     return True, ""
 
 
@@ -160,11 +163,19 @@ def fetch_history(days: int = HISTORY_DAYS, force_refresh: bool = False) -> dict
     n_from_csv, n_refreshed, n_written = 0, 0, 0
     for sid in stock_ids:
         df = load_csv(sid)
-        need_refresh = force_refresh or df is None or df.index.max() < today - pd.Timedelta(days=CSV_STALE_DAYS)
+        need_refresh = (
+            force_refresh
+            or df is None
+            or df.index.max() < today - pd.Timedelta(days=CSV_STALE_DAYS)
+        )
         if need_refresh:
             try:
                 # Only fetch the gap (last_date+1 → today), not full history
-                fetch_start = (df.index.max() + pd.Timedelta(days=1)) if df is not None else start_date
+                fetch_start = (
+                    (df.index.max() + pd.Timedelta(days=1))
+                    if df is not None
+                    else start_date
+                )
                 fresh = get_taiwan_stock_data(
                     sid, fetch_start.strftime("%Y%m%d"), today.strftime("%Y%m%d")
                 )
@@ -186,7 +197,9 @@ def fetch_history(days: int = HISTORY_DAYS, force_refresh: bool = False) -> dict
             n_from_csv += 1
         if df is not None:
             out[sid] = df.loc[df.index >= start_date]
-    print(f"  data sources: csv={n_from_csv}, refreshed={n_refreshed}, csv_written={n_written}")
+    print(
+        f"  data sources: csv={n_from_csv}, refreshed={n_refreshed}, csv_written={n_written}"
+    )
     return out
 
 
@@ -208,12 +221,22 @@ def build_obs(stock_data: dict, state: dict):
             last_prices[sid] = 0.0
             continue
         row = df.loc[last_date]
-        feats.extend([
-            row["return"], row["bias_5"], row["bias_20"], row["macd_h"],
-            row["rsi_14"], row["bb_pos"], row["atr"], row["capacity_change"],
-            row.get("return_rank", 0.5), row.get("rsi_14_rank", 0.5),
-            row.get("bias_20_rank", 0.5), row.get("capacity_change_rank", 0.5),
-        ])
+        feats.extend(
+            [
+                row["return"],
+                row["bias_5"],
+                row["bias_20"],
+                row["macd_h"],
+                row["rsi_14"],
+                row["bb_pos"],
+                row["atr"],
+                row["capacity_change"],
+                row.get("return_rank", 0.5),
+                row.get("rsi_14_rank", 0.5),
+                row.get("bias_20_rank", 0.5),
+                row.get("capacity_change_rank", 0.5),
+            ]
+        )
         last_prices[sid] = float(row["close"])
 
     feats = np.nan_to_num(feats, nan=0.0, posinf=1.0, neginf=-1.0)
@@ -226,13 +249,73 @@ def build_obs(stock_data: dict, state: dict):
 
 
 def normalize_obs(obs_raw: np.ndarray, norm_path: str, stock_data: dict) -> np.ndarray:
-    dummy = DummyVecEnv([
-        lambda: gym.make("TradingEnv-v0", stock_ids=stock_ids, stock_data=stock_data, eval_mode=True)
-    ])
+    dummy = DummyVecEnv(
+        [
+            lambda: gym.make(
+                "TradingEnv-v0",
+                stock_ids=stock_ids,
+                stock_data=stock_data,
+                eval_mode=True,
+            )
+        ]
+    )
     venv = VecNormalize.load(norm_path, dummy)
     venv.training = False
     venv.norm_reward = False
     return venv.normalize_obs(obs_raw.reshape(1, -1)).flatten().astype(np.float32)
+
+
+def load_ensemble(specs: list[tuple[str, str]], stock_data: dict):
+    """Load one (PPO, VecNormalize) pair per seed.
+
+    specs: [(model_path, norm_path), ...]. Each seed gets its own VecNormalize
+    because obs-running-mean stats diverge across training seeds.
+    """
+    seeds = []
+    for model_path, norm_path in specs:
+        dummy = DummyVecEnv(
+            [
+                lambda: gym.make(
+                    "TradingEnv-v0",
+                    stock_ids=stock_ids,
+                    stock_data=stock_data,
+                    eval_mode=True,
+                )
+            ]
+        )
+        vn = VecNormalize.load(norm_path, dummy)
+        vn.training = False
+        vn.norm_reward = False
+        m = PPO.load(model_path, device="cpu")
+        seeds.append((m, vn))
+        print(f"  loaded seed: {model_path} (norm={norm_path})")
+    return seeds
+
+
+def predict_ensemble_logits(seeds, obs_raw: np.ndarray) -> np.ndarray:
+    """Run each seed deterministically, return aggregated logits (N+1,).
+
+    Action space is Box(N+1,) raw logits — downstream softmax turns them into
+    target portfolio weights. Aggregating in logit-space (before softmax) is
+    natural because PPO's policy head is Gaussian on these continuous outputs.
+
+    Returns a single (N+1,) np.ndarray that the caller pipes through softmax
+    (already done inside execute_actions).
+    """
+    per_seed = []
+    for model, vn in seeds:
+        normed = vn.normalize_obs(obs_raw.reshape(1, -1)).astype(np.float32)
+        a, _ = model.predict(normed, deterministic=True)
+        per_seed.append(np.asarray(a, dtype=np.float64).flatten())
+    stacked = np.stack(per_seed)  # shape: (n_seeds, N+1)
+
+    aggregated = np.median(stacked, axis=0)
+
+    if aggregated is None or aggregated.shape != (stacked.shape[1],):
+        raise NotImplementedError(
+            "ensemble aggregation not implemented — see TODO(human) above"
+        )
+    return aggregated.astype(np.float64)
 
 
 def execute_actions(action_logits, prices, stock_data, state, account, password, live):
@@ -285,7 +368,18 @@ def execute_actions(action_logits, prices, stock_data, state, account, password,
                     ok, resp = False, f"ERR:{e}"
             else:
                 ok, resp = True, "PAPER"
-            log.append({"sid": sid, "action": "SELL", "lots": lots, "shares": shares, "price": p, "weight": float(target_stock_weights[i]), "resp": resp, "ok": ok})
+            log.append(
+                {
+                    "sid": sid,
+                    "action": "SELL",
+                    "lots": lots,
+                    "shares": shares,
+                    "price": p,
+                    "weight": float(target_stock_weights[i]),
+                    "resp": resp,
+                    "ok": ok,
+                }
+            )
             if ok:
                 state["cash_balance"] += gross - cost
                 state["inventory"][sid] -= shares
@@ -311,7 +405,18 @@ def execute_actions(action_logits, prices, stock_data, state, account, password,
                     ok, resp = False, f"ERR:{e}"
             else:
                 ok, resp = True, "PAPER"
-            log.append({"sid": sid, "action": "BUY", "lots": lots, "shares": shares, "price": p, "weight": float(target_stock_weights[i]), "resp": resp, "ok": ok})
+            log.append(
+                {
+                    "sid": sid,
+                    "action": "BUY",
+                    "lots": lots,
+                    "shares": shares,
+                    "price": p,
+                    "weight": float(target_stock_weights[i]),
+                    "resp": resp,
+                    "ok": ok,
+                }
+            )
             if ok:
                 state["cash_balance"] -= gross + fee
                 state["inventory"][sid] = state["inventory"].get(sid, 0) + shares
@@ -338,7 +443,17 @@ def liquidate_all(stock_data, state, account, password, live):
                 ok, resp = False, f"ERR:{e}"
         else:
             ok, resp = True, "PAPER"
-        log.append({"sid": sid, "action": "LIQUIDATE", "lots": held_lots, "shares": held, "price": p, "resp": resp, "ok": ok})
+        log.append(
+            {
+                "sid": sid,
+                "action": "LIQUIDATE",
+                "lots": held_lots,
+                "shares": held,
+                "price": p,
+                "resp": resp,
+                "ok": ok,
+            }
+        )
         if ok:
             state["cash_balance"] += gross - cost
             state["inventory"][sid] = 0
@@ -346,7 +461,9 @@ def liquidate_all(stock_data, state, account, password, live):
 
 
 def portfolio_value(prices, state) -> float:
-    inv_val = sum(state["inventory"].get(sid, 0) * prices.get(sid, 0) for sid in stock_ids)
+    inv_val = sum(
+        state["inventory"].get(sid, 0) * prices.get(sid, 0) for sid in stock_ids
+    )
     return state["cash_balance"] + inv_val
 
 
@@ -401,6 +518,47 @@ def reconcile_inventory(state: dict, account: str, password: str) -> int:
     return mismatches
 
 
+def predict_dl_ensemble_weights(
+    checkpoint_paths: list[str], stock_data: dict, obs_date
+) -> np.ndarray:
+    """Median ensemble of v4 LSTM checkpoints.
+
+    Each seed produces a (N+1,) post-softmax + post-cap weight vector. We take
+    the per-dim median across seeds (consistent with PPO ensemble in
+    predict_ensemble_logits), then renormalize to sum=1 and re-enforce the
+    per-stock cap (median can introduce small cap violations or sum drift).
+    """
+    per_seed = []
+    for p in checkpoint_paths:
+        w = predict_dl_weights(p, stock_data, obs_date)
+        per_seed.append(w.astype(np.float64))
+    stacked = np.stack(per_seed)  # shape (n_seeds, N+1)
+    median = np.median(stacked, axis=0)
+
+    # Median doesn't preserve sum=1 — renormalize.
+    median = np.clip(median, 0.0, None)
+    s = median.sum()
+    if s <= 0:
+        # Degenerate: fall back to all-cash.
+        out = np.zeros_like(median)
+        out[-1] = 1.0
+        return out
+    median /= s
+
+    # Re-enforce per-stock cap (10%), excess overflow to cash slot.
+    N = len(stock_ids)
+    cap = 0.10
+    excess = float(np.sum(np.maximum(median[:N] - cap, 0.0)))
+    median[:N] = np.minimum(median[:N], cap)
+    median[N] += excess
+    print(
+        f"  v4 ensemble (n={len(per_seed)}): "
+        f"max stock={median[:N].max():.4f}, cash={median[N]:.4f}, "
+        f"active={int((median[:N] > 0.005).sum())}"
+    )
+    return median
+
+
 def predict_dl_weights(checkpoint_path: str, stock_data: dict, obs_date) -> np.ndarray:
     """Load v4 LSTM checkpoint, build (1, N, L, F) input from latest CSVs,
     return target portfolio weights as a (N+1,) numpy array (sums to 1).
@@ -450,8 +608,10 @@ def predict_dl_weights(checkpoint_path: str, stock_data: dict, obs_date) -> np.n
 
     with torch.no_grad():
         weights = net(torch.from_numpy(feats), torch.from_numpy(mask)).numpy()[0]
-    print(f"  v4 weights: max stock={weights[:N].max():.4f}, "
-          f"cash={weights[N]:.4f}, active={int((weights[:N] > 0.005).sum())}")
+    print(
+        f"  v4 weights: max stock={weights[:N].max():.4f}, "
+        f"cash={weights[N]:.4f}, active={int((weights[:N] > 0.005).sum())}"
+    )
     return weights
 
 
@@ -459,18 +619,47 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="models/ppo_deploy_final")
     parser.add_argument("--norm", default="models/vec_normalize_deploy_final.pkl")
-    parser.add_argument("--dl-model", default=None,
-                        help="path to v4 LSTM checkpoint (.pt). When set, "
-                             "PPO model/norm are ignored.")
+    parser.add_argument(
+        "--dl-model",
+        default=None,
+        help="path to v4 LSTM checkpoint (.pt). When set, PPO model/norm are ignored.",
+    )
+    parser.add_argument(
+        "--ensemble",
+        nargs="+",
+        default=None,
+        metavar="MODEL.zip:NORM.pkl",
+        help="ensemble of PPO seed models. Each arg is 'model.zip:norm.pkl'. "
+        "Overrides --model/--norm. Ignored if --dl-model is set. "
+        "Example: --ensemble models/ppo_s0.zip:models/vn_s0.pkl "
+        "models/ppo_s1.zip:models/vn_s1.pkl",
+    )
+    parser.add_argument(
+        "--dl-ensemble",
+        nargs="+",
+        default=None,
+        metavar="CHECKPOINT.pt",
+        help="ensemble of v4 LSTM checkpoints. Median across seeds, "
+        "renormalized + re-capped. Overrides --dl-model.",
+    )
     parser.add_argument("--paper", action="store_true")
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--status", action="store_true")
-    parser.add_argument("--refresh-data", action="store_true",
-                        help="force-refresh all CSVs from TWSE before predicting")
-    parser.add_argument("--no-reconcile", action="store_true",
-                        help="skip Get_User_Stocks reconcile step in --live mode")
-    parser.add_argument("--reconcile-only", action="store_true",
-                        help="only run broker reconcile, then exit")
+    parser.add_argument(
+        "--refresh-data",
+        action="store_true",
+        help="force-refresh all CSVs from TWSE before predicting",
+    )
+    parser.add_argument(
+        "--no-reconcile",
+        action="store_true",
+        help="skip Get_User_Stocks reconcile step in --live mode",
+    )
+    parser.add_argument(
+        "--reconcile-only",
+        action="store_true",
+        help="only run broker reconcile, then exit",
+    )
     args = parser.parse_args()
 
     state = load_state()
@@ -499,8 +688,17 @@ if __name__ == "__main__":
         sys.exit(0)
 
     print(f"=== Deploy RL day {state['day_count'] + 1} ({datetime.date.today()}) ===")
-    model_label = args.dl_model if args.dl_model else args.model
-    arch = "v4-LSTM" if args.dl_model else "PPO"
+    if args.dl_ensemble:
+        model_label, arch = (
+            f"{len(args.dl_ensemble)}-seed LSTM ensemble",
+            "v4-LSTM-ensemble",
+        )
+    elif args.dl_model:
+        model_label, arch = args.dl_model, "v4-LSTM"
+    elif args.ensemble:
+        model_label, arch = f"{len(args.ensemble)}-seed ensemble", "PPO-ensemble"
+    else:
+        model_label, arch = args.model, "PPO"
     print(f"model: {model_label} [{arch}]  mode: {'LIVE' if args.live else 'PAPER'}")
 
     if state["halted"]:
@@ -522,7 +720,9 @@ if __name__ == "__main__":
     print(f"  fetched {len(stock_data)}/{len(stock_ids)} stocks")
 
     obs_raw, prices, obs_date = build_obs(stock_data, state)
-    print(f"obs date: {obs_date.date()}, {sum(1 for p in prices.values() if p > 0)} prices")
+    print(
+        f"obs date: {obs_date.date()}, {sum(1 for p in prices.values() if p > 0)} prices"
+    )
 
     load_dotenv()
     account = os.getenv("ACCOUNT") if args.live else None
@@ -541,35 +741,68 @@ if __name__ == "__main__":
     state["peak_value"] = max(state["peak_value"], port_val)
     drawdown = (state["peak_value"] - port_val) / max(state["peak_value"], 1)
     pnl = (port_val / state["initial_cash"] - 1) * 100
-    print(f"portfolio   : {port_val:,.0f}  PnL: {pnl:+.2f}%  drawdown: {drawdown * 100:.2f}%")
+    print(
+        f"portfolio   : {port_val:,.0f}  PnL: {pnl:+.2f}%  drawdown: {drawdown * 100:.2f}%"
+    )
 
     if drawdown > DRAWDOWN_STOP:
-        print(f"\n!!! DRAWDOWN TRIGGER ({drawdown * 100:.2f}% > {DRAWDOWN_STOP * 100:.0f}%) — LIQUIDATING !!!")
+        print(
+            f"\n!!! DRAWDOWN TRIGGER ({drawdown * 100:.2f}% > {DRAWDOWN_STOP * 100:.0f}%) — LIQUIDATING !!!"
+        )
         log = liquidate_all(stock_data, state, account, password, args.live)
         for item in log:
-            print(f"  LIQUIDATE {item['sid']:<6} x{item['shares']:>7}  resp={item['resp']}")
+            print(
+                f"  LIQUIDATE {item['sid']:<6} x{item['shares']:>7}  resp={item['resp']}"
+            )
         state["halted"] = True
         state["day_count"] += 1
-        state["history"].append({"date": str(obs_date.date()), "action": "halt", "port_val": port_val, "log": log})
+        state["history"].append(
+            {
+                "date": str(obs_date.date()),
+                "action": "halt",
+                "port_val": port_val,
+                "log": log,
+            }
+        )
         save_state(state)
         print(f"\nstate saved: HALTED at day {state['day_count']}")
         sys.exit(0)
 
-    if args.dl_model:
+    if args.dl_ensemble:
+        print(f"\nrunning v4 LSTM ensemble (n={len(args.dl_ensemble)})...")
+        weights = predict_dl_ensemble_weights(args.dl_ensemble, stock_data, obs_date)
+        actions = np.log(np.clip(weights, 1e-12, 1.0))
+    elif args.dl_model:
         print("\nrunning v4 LSTM inference...")
         weights = predict_dl_weights(args.dl_model, stock_data, obs_date)
         # already softmaxed + capped; reuse softmax-shape input by passing
         # log-weights so downstream softmax is identity-up-to-shift.
         actions = np.log(np.clip(weights, 1e-12, 1.0))
+    elif args.ensemble:
+        specs = []
+        for s in args.ensemble:
+            if ":" not in s:
+                print(f"ERROR: --ensemble spec '{s}' must be 'model.zip:norm.pkl'")
+                sys.exit(1)
+            mp, np_path = s.split(":", 1)
+            specs.append((mp, np_path))
+        print(f"\nloading {len(specs)}-seed ensemble...")
+        seeds = load_ensemble(specs, stock_data)
+        print(f"\nrunning ensemble predict (n={len(seeds)})...")
+        actions = predict_ensemble_logits(seeds, obs_raw)
     else:
         print("\nnormalizing obs + predicting...")
         obs = normalize_obs(obs_raw, args.norm, stock_data)
         model = PPO.load(args.model, device="cpu")
         actions, _ = model.predict(obs, deterministic=True)
 
-    log = execute_actions(actions, prices, stock_data, state, account, password, args.live)
+    log = execute_actions(
+        actions, prices, stock_data, state, account, password, args.live
+    )
     print(f"\n{len(log)} actions ({'LIVE' if args.live else 'PAPER'}):")
-    print(f"  {'sid':<6}{'action':<6}{'weight':>7}{'shares':>10}{'price':>10}{'resp':>14}")
+    print(
+        f"  {'sid':<6}{'action':<6}{'weight':>7}{'shares':>10}{'price':>10}{'resp':>14}"
+    )
     for item in log:
         print(
             f"  {item['sid']:<6}{item['action']:<6}{item['weight'] * 100:>6.2f}%"
@@ -578,12 +811,16 @@ if __name__ == "__main__":
 
     state["day_count"] += 1
     new_port = portfolio_value(prices, state)
-    state["history"].append({
-        "date": str(obs_date.date()),
-        "actions": log,
-        "port_val_before": port_val,
-        "port_val_after": new_port,
-        "drawdown": drawdown,
-    })
+    state["history"].append(
+        {
+            "date": str(obs_date.date()),
+            "actions": log,
+            "port_val_before": port_val,
+            "port_val_after": new_port,
+            "drawdown": drawdown,
+        }
+    )
     save_state(state)
-    print(f"\nstate saved: day {state['day_count']}, cash {state['cash_balance']:,.0f}, port {new_port:,.0f}")
+    print(
+        f"\nstate saved: day {state['day_count']}, cash {state['cash_balance']:,.0f}, port {new_port:,.0f}"
+    )

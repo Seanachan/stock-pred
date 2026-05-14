@@ -59,19 +59,30 @@ class TradingEnv(gym.Env):
         self.render_mode = render_mode
 
         # Action: raw logits over (N stocks + cash); env softmaxes to weights.
-        # Bounds chosen so post-softmax weights span ~ uniform .. concentrated.
+        # v3 widened to ±5 so policy can express concentrated allocations
+        # (single stock weight up to ~93% pre-cap, vs ~30% at ±3) — the
+        # 10% per-stock cap then enforces diversification. Wider box lets
+        # the cap actually bind in training, not just at extreme tails.
         self.action_space = spaces.Box(
-            low=-3.0,
-            high=3.0,
+            low=-5.0,
+            high=5.0,
             shape=(self.num_stocks + 1,),
             dtype=np.float32,
         )
         self.sharpe_window = 20
         self.return_history = deque(maxlen=self.sharpe_window)
-        # v2.1 turnover guards
-        self.max_pos_weight = 0.10  # cap any single stock at 10% (paper #2)
-        self.weight_deadband = 0.005  # skip rebalance under 0.5% drift
-        self.turnover_lambda = 0.1  # explicit -λ·Σ|Δw| in reward
+        # v3 turnover guards (tightened after v3_smoke over-traded: 10812 trades
+        # on 2y test, α=−47% — log-utility fixed cash-parking but model
+        # churned. Raise λ from 0.1 → 1.0 so penalty bites at reward_scale=100;
+        # widen deadband from 0.5% → 2% so noise-level drift doesn't trigger
+        # rebalances across a 45-stock basket.
+        self.max_pos_weight = 0.10  # cap any single stock at 10%
+        self.weight_deadband = 0.02  # skip rebalance under 2% drift
+        self.turnover_lambda = 1.0  # explicit -λ·Σ|Δw| in reward
+        # v3 reward + exposure: kill Sharpe-induced cash-parking degenerate.
+        # log-utility rewards real growth; cash cap forces risk-taking.
+        self.max_cash_weight = 0.50
+        self.reward_scale = 100.0  # scale log-return so PPO sees O(1) reward
         self.feat_per_stock = 12
         self.observation_dim = (
             (self.num_stocks * self.feat_per_stock) + 1 + self.num_stocks
@@ -286,14 +297,13 @@ class TradingEnv(gym.Env):
         step_ret = (current_total_asset / max(previous_total_asset, 1.0)) - 1.0
         self.return_history.append(step_ret)
 
-        if len(self.return_history) >= 5:
-            arr = np.asarray(self.return_history)
-            std = float(arr.std())
-            reward = float(arr.mean()) / (std + 1e-6)
-        else:
-            reward = step_ret * 100.0
-
-        # v2.1: explicit turnover penalty so PPO sees churn cost directly.
+        # v3 reward: log-utility of equity growth, scaled to O(1).
+        # log(W_t / W_{t-1}) has no Sharpe-style cash-parking degeneracy —
+        # cash earns 0 log-return, so the agent must take risk to score.
+        reward = self.reward_scale * float(
+            np.log(max(current_total_asset, 1.0) / max(previous_total_asset, 1.0))
+        )
+        # Explicit turnover penalty so PPO sees churn cost directly.
         reward -= self.turnover_lambda * turnover
 
         self.asset_history.append(current_total_asset)
@@ -328,11 +338,14 @@ class TradingEnv(gym.Env):
         return e / np.sum(e)
 
     def _cap_and_renorm(self, weights: np.ndarray) -> np.ndarray:
-        """Clip per-stock weight to max_pos_weight; excess goes to cash slot.
+        """Clip per-stock weight to max_pos_weight; cap cash at max_cash_weight.
 
-        Cash (last entry) keeps any excess so weights still sum to 1. If after
-        capping the stock weights already exceed 1 (impossible after softmax),
-        renormalize the stock block.
+        Step 1: clip each stock to max_pos_weight, push excess into cash slot
+        (preserves sum=1).
+        Step 2: if cash slot then exceeds max_cash_weight, redistribute the
+        overflow to stocks that still have headroom (under the per-stock cap),
+        proportional to remaining headroom. Forces minimum equity exposure of
+        (1 - max_cash_weight), killing the cash-parking degenerate solution.
         """
         N = self.num_stocks
         capped = weights.copy()
@@ -340,6 +353,19 @@ class TradingEnv(gym.Env):
         excess = float(np.sum(np.maximum(capped[:N] - cap, 0.0)))
         capped[:N] = np.minimum(capped[:N], cap)
         capped[N] = capped[N] + excess
+
+        # v3: enforce cash ceiling.
+        if capped[N] > self.max_cash_weight:
+            overflow = capped[N] - self.max_cash_weight
+            capped[N] = self.max_cash_weight
+            headroom = cap - capped[:N]  # per-stock room left under cap
+            headroom = np.maximum(headroom, 0.0)
+            total_headroom = float(headroom.sum())
+            if total_headroom > 0:
+                capped[:N] += overflow * (headroom / total_headroom)
+            else:
+                # all stocks already at cap — dump back into cash (rare edge).
+                capped[N] += overflow
         return capped
 
     def _terminate_step(self, total_asset, prices, trades, fees):

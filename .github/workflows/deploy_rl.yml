@@ -53,11 +53,16 @@ jobs:
           PASSWORD: ${{ secrets.NCKU_PASSWORD }}
         run: |
           MODE="${{ github.event.inputs.mode || 'live' }}"
-          MODEL="--dl-model models/dl_v4_deploy.pt"
+          ENSEMBLE="--dl-ensemble \
+            models/dl_v4_seed0.pt \
+            models/dl_v4_seed1.pt \
+            models/dl_v4_seed2.pt \
+            models/dl_v4_seed3.pt \
+            models/dl_v4_seed4.pt"
           if [ "$MODE" = "live" ]; then
-            uv run python -m RL.deploy_rl --live $MODEL
+            uv run python -m RL.deploy_rl --live $ENSEMBLE
           else
-            uv run python -m RL.deploy_rl --paper $MODEL
+            uv run python -m RL.deploy_rl --paper $ENSEMBLE
           fi
 
       - name: Commit state + refreshed CSVs

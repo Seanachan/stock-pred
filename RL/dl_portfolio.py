@@ -250,6 +250,20 @@ def sharpe_loss(pnl: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
     return -(pnl.mean() / (pnl.std() + eps))
 
 
+def log_utility_loss(pnl: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+    """Negative mean log-wealth growth — minimise.
+
+    Maximising E[log(1 + r_t)] is equivalent to maximising terminal wealth
+    under iid returns (Kelly criterion). Unlike Sharpe, cash (pnl=0) earns
+    log(1)=0 — no degenerate cash-parking solution. Clamp pnl > -1 to avoid
+    log(0) when transaction costs + adverse return exceed -100% in one step
+    (shouldn't happen with realistic tx_cost but guards against numerical
+    blow-up during early training noise).
+    """
+    safe_pnl = torch.clamp(pnl, min=-0.99)
+    return -(torch.log1p(safe_pnl).mean())
+
+
 def entropy_penalty(weights: torch.Tensor, eps: float = 1e-9) -> torch.Tensor:
     """Average entropy of the weight distribution. Add to loss to push sparser.
 

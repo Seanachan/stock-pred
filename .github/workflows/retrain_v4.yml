@@ -1,4 +1,4 @@
-name: Weekly Retrain v4 Deploy Model
+name: Weekly Retrain v4 LSTM Ensemble (5 seeds)
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    timeout-minutes: 30
+    timeout-minutes: 90
 
     steps:
       - name: Checkout
@@ -38,7 +38,7 @@ jobs:
       - name: Install dependencies
         run: uv pip install -r requirements.txt
 
-      - name: Train v4 LSTM deploy model
+      - name: Train v4 LSTM 5-seed ensemble
         run: |
           uv run python -m RL.dl_train_deploy \
             --epochs 500 \
@@ -46,17 +46,17 @@ jobs:
             --window 50 \
             --hidden 32 \
             --max-weight 0.10 \
-            --out models/dl_v4_deploy.pt
+            --seeds 0,1,2,3,4
 
-      - name: Commit refreshed model
+      - name: Commit refreshed ensemble
         if: success()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add models/dl_v4_deploy.pt
+          git add models/dl_v4_seed*.pt
           if ! git diff --cached --quiet; then
-            git commit -m "retrain: v4 LSTM model $(date -u +%Y-%m-%d)"
+            git commit -m "retrain: v4 LSTM 5-seed ensemble $(date -u +%Y-%m-%d)"
             git push
           else
-            echo "model unchanged; skipping commit"
+            echo "models unchanged; skipping commit"
           fi

@@ -57,7 +57,12 @@ def main():
     parser.add_argument("--max-weight", type=float, default=0.10)
     parser.add_argument("--train-recent", type=int, default=500)
     parser.add_argument("--out", default="models/dl_v4_deploy.pt")
-    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--seed", type=int, default=0,
+                        help="single seed (used when --seeds omitted)")
+    parser.add_argument("--seeds", default=None,
+                        help="comma-separated seed list, e.g. '0,1,2,3,4'. "
+                             "When set, trains one model per seed and saves "
+                             "as models/dl_v4_seed{N}.pt (overrides --out).")
     args = parser.parse_args()
 
     end = args.end or pd.Timestamp.today().strftime("%Y%m%d")
@@ -70,21 +75,9 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"device: {device}")
 
-    torch.manual_seed(args.seed)
     fe = FeatureExtractor(stock_ids)
     tr = build_tensors(data, fe, stock_ids, device=device)
-
     feat_per_stock = tr["feats"].shape[-1]
-    net = PortfolioNetLSTM(
-        num_stocks=len(stock_ids),
-        feat_per_stock=feat_per_stock,
-        window_len=args.window,
-        hidden=args.hidden,
-        max_weight=args.max_weight,
-        use_sparsemax=False,
-    ).to(device)
-    opt = torch.optim.Adam(net.parameters(), lr=args.lr, weight_decay=1e-5)
-
     feats_x, rets_y, mask_x = windowize(
         tr["feats"], tr["rets"], tr["mask"], args.window
     )
@@ -94,38 +87,59 @@ def main():
         mask_x = mask_x[-args.train_recent:]
     print(f"train tensor: {feats_x.shape}")
 
-    best = -1e9
-    for epoch in range(args.epochs):
-        net.train()
-        weights = net(feats_x, mask_x)
-        pnl = realized_returns(weights, rets_y, tx_cost=0.0042)
-        loss = sharpe_loss(pnl)
-        opt.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(net.parameters(), 1.0)
-        opt.step()
-        sharpe = -loss.item()
-        best = max(best, sharpe)
-        if (epoch + 1) % 50 == 0:
-            print(f"  epoch {epoch + 1:>4}  sharpe={sharpe:+.3f}  best={best:+.3f}  "
-                  f"μ={pnl.mean().item() * 100:+.3f}%")
+    seed_list = (
+        [int(s) for s in args.seeds.split(",")] if args.seeds else [args.seed]
+    )
 
-    os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
-    torch.save({
-        "state_dict": net.state_dict(),
-        "config": {
-            "num_stocks": len(stock_ids),
-            "feat_per_stock": feat_per_stock,
-            "window_len": args.window,
-            "hidden": args.hidden,
-            "max_weight": args.max_weight,
-            "use_sparsemax": False,
-        },
-        "stock_ids": stock_ids,
-        "feat_cols": tr["feat_cols"],
-        "trained_through": end,
-    }, args.out)
-    print(f"saved {args.out}  (best train sharpe {best:+.3f})")
+    for seed in seed_list:
+        print(f"\n=== training seed {seed} ===")
+        torch.manual_seed(seed)
+        net = PortfolioNetLSTM(
+            num_stocks=len(stock_ids),
+            feat_per_stock=feat_per_stock,
+            window_len=args.window,
+            hidden=args.hidden,
+            max_weight=args.max_weight,
+            use_sparsemax=False,
+        ).to(device)
+        opt = torch.optim.Adam(net.parameters(), lr=args.lr, weight_decay=1e-5)
+
+        best = -1e9
+        for epoch in range(args.epochs):
+            net.train()
+            weights = net(feats_x, mask_x)
+            pnl = realized_returns(weights, rets_y, tx_cost=0.0042)
+            loss = sharpe_loss(pnl)
+            opt.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(net.parameters(), 1.0)
+            opt.step()
+            sharpe = -loss.item()
+            best = max(best, sharpe)
+            if (epoch + 1) % 50 == 0:
+                print(f"  epoch {epoch + 1:>4}  sharpe={sharpe:+.3f}  "
+                      f"best={best:+.3f}  μ={pnl.mean().item() * 100:+.3f}%")
+
+        out_path = (
+            f"models/dl_v4_seed{seed}.pt" if args.seeds else args.out
+        )
+        os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+        torch.save({
+            "state_dict": net.state_dict(),
+            "config": {
+                "num_stocks": len(stock_ids),
+                "feat_per_stock": feat_per_stock,
+                "window_len": args.window,
+                "hidden": args.hidden,
+                "max_weight": args.max_weight,
+                "use_sparsemax": False,
+            },
+            "stock_ids": stock_ids,
+            "feat_cols": tr["feat_cols"],
+            "trained_through": end,
+            "seed": seed,
+        }, out_path)
+        print(f"saved {out_path}  (best train sharpe {best:+.3f})")
 
 
 if __name__ == "__main__":
