@@ -502,4 +502,7 @@ def train_one_fold_lstm(
         "active_stocks_avg": active,
         "cash_weight_avg": float(avg_w[-1]),
         "stock_weights_avg": [float(x) for x in avg_w[:-1]],
+        "val_weights": weights_v.detach().cpu().numpy(),
+        "val_rets": rets_v_y.detach().cpu().numpy(),
+        "tx_cost": tx_cost,
     }
