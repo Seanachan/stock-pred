@@ -74,20 +74,26 @@ def round_to_tick(price: float) -> float:
 
 
 def submit_price(sid: str, stock_data: dict, side: Literal["BUY", "SELL"]) -> float:
-    """Pick limit price inside today's [low, high] band so order can fill.
+    """Pick limit price likely inside today's [low, high] band.
 
-    Returns 0 if today's bar unavailable.
+    NCKU sim fills only when submitted price ∈ today's [low, high]. We
+    submit pre-market (16:01→08:59 prev evening) without seeing today's
+    range, so we anchor on prev_close — the best single estimator of
+    today's intraday band. Today's [low, high] contains prev_close on
+    most non-gap days (~80%+); gap days miss but no pre-market price
+    can avoid that without intraday quotes.
+
+    Returns 0 if prev bar unavailable. `side` retained for API stability
+    but no longer affects price — symmetric anchoring outperforms the
+    old aggressive/bargain skew on the sim's in-range fill rule.
     """
     df = stock_data.get(sid)
     if df is None or df.empty:
         return 0.0
-    row = df.iloc[-1]
-    open_ = float(row.get("open", 0) or 0)
-    close = float(row.get("close", 0) or 0)
-    if open_ <= 0 or close <= 0:
+    prev_close = float(df.iloc[-1].get("close", 0) or 0)
+    if prev_close <= 0:
         return 0.0
-    price = max(open_, close) if side == "BUY" else min(open_, close)
-    return round_to_tick(price)
+    return round_to_tick(prev_close)
 
 
 def is_trading_window(now: datetime.datetime | None = None) -> tuple[bool, str]:
@@ -492,6 +498,58 @@ def parse_broker_inventory(resp) -> dict:
     return inv
 
 
+def settle_pending_fills(state: dict, account: str, password: str) -> int:
+    """Refund cash for yesterday's optimistic orders that never filled.
+
+    execute_actions debits cash + credits inventory on broker ACK (which only
+    confirms submission, not fill). NCKU sim fills only when submitted price
+    lands in that day's [low, high] — typically ~20% of orders miss. Without
+    this settle, missed orders cause permanent cash drift (reconcile fixes
+    inventory but never cash).
+
+    Walks state['pending_fills'] from prior run, diffs against broker truth,
+    reverses cash impact for any unfilled shares.
+    """
+    pending = state.get("pending_fills", [])
+    if not pending:
+        return 0
+    try:
+        raw = Get_User_Stocks(account, password)
+    except Exception as e:
+        print(f"  SETTLE skipped (broker err: {e})")
+        return -1
+    broker = parse_broker_inventory(raw)
+
+    expected = {sid: int(state["inventory"].get(sid, 0)) for sid in stock_ids}
+    unfilled = 0
+    for order in pending:
+        sid = order.get("sid")
+        side = order.get("action")
+        shares = int(order.get("shares") or 0)
+        price = float(order.get("price") or 0)
+        if sid not in expected or shares <= 0 or price <= 0:
+            continue
+        delta = broker.get(sid, 0) - expected[sid]
+        if side == "BUY" and delta < 0:
+            miss = min(-delta, shares)
+            gross = miss * price
+            fee = max(gross * FEE, MIN_FEE) if miss == shares else gross * FEE
+            state["cash_balance"] += gross + fee
+            expected[sid] -= miss
+            unfilled += 1
+            print(f"  SETTLE {sid}: BUY unfilled {miss}sh, refund {gross + fee:,.0f}")
+        elif side == "SELL" and delta > 0:
+            miss = min(delta, shares)
+            gross = miss * price
+            cost = gross * (TAX + FEE)
+            state["cash_balance"] -= gross - cost
+            expected[sid] += miss
+            unfilled += 1
+            print(f"  SETTLE {sid}: SELL unfilled {miss}sh, reverse {gross - cost:,.0f}")
+    state["pending_fills"] = []
+    return unfilled
+
+
 def reconcile_inventory(state: dict, account: str, password: str) -> int:
     """Overwrite state['inventory'] with broker truth. Cash is not touched —
     the lab API does not expose it. Returns the number of stocks whose
@@ -732,6 +790,10 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if args.live and account and not args.no_reconcile:
+        print("\nsettling yesterday's pending fills...")
+        u = settle_pending_fills(state, account, password)
+        if u >= 0:
+            print(f"  {u} unfilled order(s) refunded")
         print("\nreconciling inventory with broker...")
         n = reconcile_inventory(state, account, password)
         if n >= 0:
@@ -811,6 +873,16 @@ if __name__ == "__main__":
 
     state["day_count"] += 1
     new_port = portfolio_value(prices, state)
+    state["pending_fills"] = [
+        {
+            "sid": e["sid"],
+            "action": e["action"],
+            "shares": e["shares"],
+            "price": e["price"],
+        }
+        for e in log
+        if e.get("ok") and e.get("resp") == "OK"
+    ]
     state["history"].append(
         {
             "date": str(obs_date.date()),
