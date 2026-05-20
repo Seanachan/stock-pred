@@ -50,8 +50,8 @@
     "9921": 0,
     "3231": 0
   },
-  "peak_value": 100000000,
-  "halted": true,
+  "peak_value": 89007157.49000002,
+  "halted": false,
   "history": [
     {
       "date": "2026-05-08",
