@@ -1,5 +1,5 @@
 {
-  "day_count": 4,
+  "day_count": 5,
   "initial_cash": 100000000,
   "cash_balance": 81314961.70875002,
   "inventory": {
@@ -625,6 +625,164 @@
           "shares": 1000,
           "price": 22.7,
           "weight": 0.00044236950132923086,
+          "resp": "OK",
+          "ok": true
+        }
+      ],
+      "port_val_before": 89007157.49000002,
+      "port_val_after": 88996211.70875002,
+      "drawdown": 0.0
+    },
+    {
+      "date": "2026-05-18",
+      "actions": [
+        {
+          "sid": "2454",
+          "action": "BUY",
+          "lots": 2,
+          "shares": 2000,
+          "price": 3400.0,
+          "weight": 0.09977408441469211,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2303",
+          "action": "BUY",
+          "lots": 2,
+          "shares": 2000,
+          "price": 111.0,
+          "weight": 0.0033280808240917733,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2354",
+          "action": "BUY",
+          "lots": 2,
+          "shares": 2000,
+          "price": 58.6,
+          "weight": 0.0013912433316186992,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2881",
+          "action": "BUY",
+          "lots": 2,
+          "shares": 2000,
+          "price": 95.2,
+          "weight": 0.0030185913420109007,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2884",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 31.7,
+          "weight": 0.00040252702558368184,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2885",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 54.3,
+          "weight": 0.0007453847460795854,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2887",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 23.45,
+          "weight": 0.0004285658783946135,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2890",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 30.0,
+          "weight": 0.0004124430652722427,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2880",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 31.85,
+          "weight": 0.0003879035937187605,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2892",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 28.75,
+          "weight": 0.000482250783664725,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "1101",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 24.05,
+          "weight": 0.0004079436147862975,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "1102",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 34.35,
+          "weight": 0.000398695479974324,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2002",
+          "action": "BUY",
+          "lots": 2,
+          "shares": 2000,
+          "price": 18.2,
+          "weight": 0.0004282333052651166,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2618",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 34.1,
+          "weight": 0.0004235087225454344,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "5880",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 22.7,
+          "weight": 0.0004423691006536878,
           "resp": "OK",
           "ok": true
         }
