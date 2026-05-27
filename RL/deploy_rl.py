@@ -83,12 +83,18 @@ def submit_price(sid: str, stock_data: dict, side: Literal["BUY", "SELL"]) -> fl
     most non-gap days (~80%+); gap days miss but no pre-market price
     can avoid that without intraday quotes.
 
-    Returns 0 if prev bar unavailable. `side` retained for API stability
-    but no longer affects price — symmetric anchoring outperforms the
-    old aggressive/bargain skew on the sim's in-range fill rule.
+    Returns 0 if prev bar unavailable or too stale to trust. `side`
+    retained for API stability but no longer affects price — symmetric
+    anchoring outperforms the old aggressive/bargain skew on the sim's
+    in-range fill rule.
     """
     df = stock_data.get(sid)
     if df is None or df.empty:
+        return 0.0
+    last_date = df.index[-1]
+    age_days = (pd.Timestamp(datetime.date.today()) - last_date).days
+    if age_days > PRICE_STALE_DAYS:
+        print(f"  [{sid}] SKIP: last bar {last_date.date()} is {age_days}d stale")
         return 0.0
     prev_close = float(df.iloc[-1].get("close", 0) or 0)
     if prev_close <= 0:
@@ -141,7 +147,11 @@ def save_state(state: dict):
 
 
 DATA_DIR = Path("RL/data")
-CSV_STALE_DAYS = 7  # if CSV last_date older than this, refresh from API
+# Execution pricing needs the most-recent close every run, so refresh
+# whenever the cached bar isn't today's. (The old CSV_STALE_DAYS=7 window
+# let prices freeze for a week → orders priced on a stale close fell
+# outside the session's [low, high] and got rejected by the sim.)
+PRICE_STALE_DAYS = 5  # submit_price refuses to price a bar older than this
 
 
 def load_csv(sid: str) -> pd.DataFrame | None:
@@ -169,11 +179,7 @@ def fetch_history(days: int = HISTORY_DAYS, force_refresh: bool = False) -> dict
     n_from_csv, n_refreshed, n_written = 0, 0, 0
     for sid in stock_ids:
         df = load_csv(sid)
-        need_refresh = (
-            force_refresh
-            or df is None
-            or df.index.max() < today - pd.Timedelta(days=CSV_STALE_DAYS)
-        )
+        need_refresh = force_refresh or df is None or df.index.max() < today
         if need_refresh:
             try:
                 # Only fetch the gap (last_date+1 → today), not full history
