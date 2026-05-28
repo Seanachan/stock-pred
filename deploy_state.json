@@ -1,11 +1,11 @@
 {
-  "day_count": 8,
+  "day_count": 9,
   "initial_cash": 100000000,
-  "cash_balance": 84276175.43375002,
+  "cash_balance": 80113802.49250002,
   "inventory": {
     "2330": 0,
     "2317": 0,
-    "2454": 1000,
+    "2454": 2000,
     "2308": 0,
     "2382": 0,
     "2303": 0,
@@ -45,7 +45,7 @@
     "2615": 0,
     "2618": 0,
     "2912": 0,
-    "5880": 1000,
+    "5880": 0,
     "6415": 0,
     "9921": 0,
     "3231": 0
@@ -964,32 +964,64 @@
       "port_val_before": 89007157.49000002,
       "port_val_after": 89000425.43375002,
       "drawdown": 0.0
+    },
+    {
+      "date": "2026-05-27",
+      "actions": [
+        {
+          "sid": "2454",
+          "action": "BUY",
+          "lots": 2,
+          "shares": 2000,
+          "price": 4410.0,
+          "weight": 0.10000000000000005,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2887",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 23.0,
+          "weight": 0.00026592139792938033,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2002",
+          "action": "BUY",
+          "lots": 2,
+          "shares": 2000,
+          "price": 18.85,
+          "weight": 0.0005895820562508308,
+          "resp": "OK",
+          "ok": true
+        }
+      ],
+      "port_val_before": 89007157.49000002,
+      "port_val_after": 89455302.49250002,
+      "drawdown": 0.0
     }
   ],
   "pending_fills": [
     {
       "sid": "2454",
       "action": "BUY",
-      "shares": 1000,
-      "price": 4640.0
+      "shares": 2000,
+      "price": 4410.0
     },
     {
       "sid": "2887",
       "action": "BUY",
       "shares": 1000,
-      "price": 23.3
+      "price": 23.0
     },
     {
       "sid": "2002",
       "action": "BUY",
       "shares": 2000,
-      "price": 19.1
-    },
-    {
-      "sid": "5880",
-      "action": "BUY",
-      "shares": 1000,
-      "price": 22.75
+      "price": 18.85
     }
   ]
 }
