@@ -1,14 +1,14 @@
 {
-  "day_count": 11,
+  "day_count": 12,
   "initial_cash": 100000000,
-  "cash_balance": 74348799.05250002,
+  "cash_balance": 79366439.01500003,
   "inventory": {
     "2330": 0,
     "2317": 0,
     "2454": 1000,
     "2308": 0,
     "2382": 0,
-    "2303": 60000,
+    "2303": 23000,
     "5347": 0,
     "8046": 0,
     "2474": 0,
@@ -46,7 +46,7 @@
     "2618": 0,
     "2912": 0,
     "5880": 0,
-    "6415": 2000,
+    "6415": 3000,
     "9921": 0,
     "3231": 0
   },
@@ -1098,6 +1098,54 @@
       "port_val_before": 89007157.49000002,
       "port_val_after": 88638799.05250002,
       "drawdown": 0.0
+    },
+    {
+      "date": "2026-06-02",
+      "actions": [
+        {
+          "sid": "2454",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 4525.0,
+          "weight": 0.10000000000000002,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2303",
+          "action": "BUY",
+          "lots": 23,
+          "shares": 23000,
+          "price": 141.5,
+          "weight": 0.03704135659597195,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2881",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 113.5,
+          "weight": 0.0017166814780253574,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "6415",
+          "action": "BUY",
+          "lots": 3,
+          "shares": 3000,
+          "price": 578.0,
+          "weight": 0.020440303366410072,
+          "resp": "OK",
+          "ok": true
+        }
+      ],
+      "port_val_before": 89007157.49000002,
+      "port_val_after": 88993439.01500003,
+      "drawdown": 0.0
     }
   ],
   "pending_fills": [
@@ -1105,25 +1153,25 @@
       "sid": "2454",
       "action": "BUY",
       "shares": 1000,
-      "price": 4555.0
+      "price": 4525.0
     },
     {
       "sid": "2303",
       "action": "BUY",
-      "shares": 60000,
-      "price": 146.0
+      "shares": 23000,
+      "price": 141.5
     },
     {
       "sid": "2881",
       "action": "BUY",
       "shares": 1000,
-      "price": 110.5
+      "price": 113.5
     },
     {
       "sid": "6415",
       "action": "BUY",
-      "shares": 2000,
-      "price": 606.0
+      "shares": 3000,
+      "price": 578.0
     }
   ]
 }
