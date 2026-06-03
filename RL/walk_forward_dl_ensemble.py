@@ -25,41 +25,52 @@ from RL.walk_forward_dl import FOLDS, load_data
 
 
 def aggregate_weights(
-    per_seed_weights: list[np.ndarray], cap: float = 0.10
+    per_seed_weights: list[np.ndarray],
+    per_seed_scores: list[float] | None = None,
+    cap: float = 0.10,
 ) -> np.ndarray:
-    """Median-aggregate per-seed daily weight matrices, renormalize, re-cap.
+    """Sharpe-weighted-mean across seeds, renormalize, re-cap.
 
     Each entry of per_seed_weights has shape (T_val, N+1) — daily portfolio
     weights including the cash slot at index -1, post-softmax + post-cap from
     its own seed. Return shape (T_val, N+1) with each row a valid simplex
     point obeying the per-stock cap (cash slot uncapped).
 
-    Mirror RL.deploy_rl.predict_dl_ensemble_weights so backtest matches the
-    decision rule used in live trading. Steps the deploy code performs daily:
-      - per-dim median across seeds
-      - clip negatives, renormalize sum=1 (fallback to all-cash if sum<=0)
-      - clip each stock weight to `cap`, overflow → cash slot
+    v5: per-dim median (v4) wiped conviction trades — any seed at zero on a
+    stock pulled the median down. Replace with softmax(per_seed_scores)-
+    weighted mean; scores are each seed's held-out val Sharpe. If scores
+    are None, falls back to uniform mean.
+
+    MIRRORS `RL.deploy_rl.predict_dl_ensemble_weights` exactly so backtest =
+    live. Any change here must be replicated there.
     """
     stacked = np.stack(
         [w.astype(np.float64) for w in per_seed_weights], axis=0
     )  # (seeds, T, N+1)
-    med = np.median(stacked, axis=0)  # (T, N+1)
+    n_seeds = stacked.shape[0]
+    if per_seed_scores is None:
+        w_s = np.full(n_seeds, 1.0 / n_seeds, dtype=np.float64)
+    else:
+        s = np.asarray(per_seed_scores, dtype=np.float64)
+        w_s = np.exp(s - s.max())
+        w_s /= w_s.sum()
+    agg = (stacked * w_s[:, None, None]).sum(axis=0)  # (T, N+1)
 
-    med = np.clip(med, 0.0, None)
-    row_sum = med.sum(axis=1, keepdims=True)  # (T, 1)
+    agg = np.clip(agg, 0.0, None)
+    row_sum = agg.sum(axis=1, keepdims=True)  # (T, 1)
     degenerate = (row_sum <= 0).flatten()
     safe_sum = np.where(row_sum <= 0, 1.0, row_sum)
-    med = med / safe_sum
+    agg = agg / safe_sum
     if degenerate.any():
-        med[degenerate] = 0.0
-        med[degenerate, -1] = 1.0
+        agg[degenerate] = 0.0
+        agg[degenerate, -1] = 1.0
 
-    N = med.shape[1] - 1
-    stocks = med[:, :N]
+    N = agg.shape[1] - 1
+    stocks = agg[:, :N]
     excess = np.maximum(stocks - cap, 0.0).sum(axis=1)  # (T,)
-    med[:, :N] = np.minimum(stocks, cap)
-    med[:, -1] = med[:, -1] + excess
-    return med
+    agg[:, :N] = np.minimum(stocks, cap)
+    agg[:, -1] = agg[:, -1] + excess
+    return agg
 
 
 def run_fold(
@@ -89,6 +100,7 @@ def run_fold(
     per_seed_w = []
     per_seed_returns = []
     per_seed_ew = []
+    per_seed_val_sharpe = []
     rets_v_y = None
     tx_cost = None
     for s in range(seeds):
@@ -115,12 +127,13 @@ def run_fold(
         per_seed_w.append(out["val_weights"])
         per_seed_returns.append(out["return"])
         per_seed_ew.append(out["ew"])
+        per_seed_val_sharpe.append(out["val_sharpe"])
         if rets_v_y is None:
             rets_v_y = out["val_rets"]
             tx_cost = out["tx_cost"]
         print(
             f"  [fold {fold_idx} seed {s}] ret={out['return'] * 100:+.2f}% "
-            f"alpha={out['alpha'] * 100:+.2f}%"
+            f"alpha={out['alpha'] * 100:+.2f}% val_sharpe={out['val_sharpe']:+.3f}"
         )
 
     # Sanity: all seeds should have produced the same T_val grid.
@@ -128,7 +141,9 @@ def run_fold(
     if len(shapes) != 1:
         raise RuntimeError(f"seed weight shapes diverged: {shapes}")
 
-    agg = aggregate_weights(per_seed_w, cap=max_weight)
+    agg = aggregate_weights(
+        per_seed_w, per_seed_scores=per_seed_val_sharpe, cap=max_weight
+    )
     agg_t = torch.from_numpy(agg.astype(np.float32))
     rets_t = torch.from_numpy(rets_v_y.astype(np.float32))
     pnl = realized_returns(agg_t, rets_t, tx_cost=tx_cost)

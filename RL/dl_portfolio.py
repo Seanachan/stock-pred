@@ -19,6 +19,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
+import pandas as pd
 import torch
 from torch import nn
 
@@ -41,6 +42,7 @@ def build_tensors(stock_data, feature_extractor, stock_ids, device="cpu"):
         "return", "bias_5", "bias_20", "macd_h", "rsi_14", "bb_pos", "atr",
         "capacity_change", "return_rank", "rsi_14_rank", "bias_20_rank",
         "capacity_change_rank",
+        "vol_20", "mom_60",  # v5: append-only — checkpoint order is load-bearing
     ]
     F = len(feat_cols)
     N = len(stock_ids)
@@ -164,23 +166,32 @@ class PortfolioNetLSTM(nn.Module):
     state at the last timestep of the window is the per-stock embedding.
     """
 
-    def __init__(self, num_stocks: int, feat_per_stock: int = 12,
+    def __init__(self, num_stocks: int, feat_per_stock: int = 14,
                  window_len: int = 50, hidden: int = 64, max_weight: float = 0.10,
-                 use_sparsemax: bool = False):
+                 use_sparsemax: bool = False, emb_dim: int = 4):
         super().__init__()
         self.N = num_stocks
         self.F = feat_per_stock
         self.L = window_len
+        self.emb_dim = emb_dim
         self.max_weight = max_weight
         self.use_sparsemax = use_sparsemax
 
-        self.lstm = nn.LSTM(feat_per_stock, hidden, batch_first=True)
+        # v5: per-stock learnable embedding breaks permutation-equivariance,
+        # so the model can learn "TSMC ≠ 1101". Stock index aligns with
+        # `stock_ids` saved in the checkpoint (deploy guards order).
+        self.stock_emb = nn.Embedding(num_stocks, emb_dim)
+        self.lstm = nn.LSTM(feat_per_stock + emb_dim, hidden, batch_first=True)
         self.head = nn.Linear(hidden, 1)
         self.cash_logit = nn.Parameter(torch.zeros(1))
 
     def forward(self, feats: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
         T, N, L, F = feats.shape
-        x = feats.reshape(T * N, L, F)
+        # v5: append per-stock embedding to every timestep of every window.
+        ids = torch.arange(N, device=feats.device)
+        emb = self.stock_emb(ids).view(1, N, 1, self.emb_dim).expand(T, N, L, self.emb_dim)
+        feats_aug = torch.cat([feats, emb], dim=-1)  # (T, N, L, F + emb_dim)
+        x = feats_aug.reshape(T * N, L, F + self.emb_dim)
         out, _ = self.lstm(x)
         last = out[:, -1, :]
         scores = self.head(last).squeeze(-1).reshape(T, N)
