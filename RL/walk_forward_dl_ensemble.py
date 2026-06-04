@@ -13,6 +13,7 @@ This is the OOS analogue of the deployed ensemble decision rule.
 import argparse
 import json
 import os
+import pickle
 
 import numpy as np
 import pandas as pd
@@ -22,6 +23,10 @@ from RL.constant import stock_ids
 from RL.dl_portfolio import realized_returns, train_one_fold_lstm
 from RL.feature import FeatureExtractor
 from RL.walk_forward_dl import FOLDS, load_data
+
+# Per-fold raw seed weights, cached so aggregation schemes (uniform / median /
+# sharpe-weighted) can be swept offline from a single walk-forward run.
+_FOLD_CACHE = []
 
 
 def aggregate_weights(
@@ -152,6 +157,17 @@ def run_fold(
     ens_sharpe = float(pnl.mean() / (pnl.std() + 1e-9))
 
     ew_ret = float(np.mean(per_seed_ew))  # identical across seeds (same val data)
+
+    _FOLD_CACHE.append({
+        "fold": fold_idx,
+        "val": (val_s, val_e),
+        "per_seed_weights": [np.asarray(w) for w in per_seed_w],
+        "per_seed_val_sharpe": [float(s) for s in per_seed_val_sharpe],
+        "val_rets": np.asarray(rets_v_y),
+        "tx_cost": float(tx_cost),
+        "ew": ew_ret,
+    })
+
     return {
         "fold": fold_idx,
         "train": (tr_s, tr_e),
@@ -250,3 +266,8 @@ if __name__ == "__main__":
     with open(out_fp, "w") as f:
         json.dump(results, f, indent=2, default=str)
     print(f"\nSaved {out_fp}")
+
+    cache_fp = f"walk_forward_{args.tag}_cache.pkl"
+    with open(cache_fp, "wb") as f:
+        pickle.dump(_FOLD_CACHE, f)
+    print(f"Saved {cache_fp}  ({len(_FOLD_CACHE)} folds, per-seed weights)")
