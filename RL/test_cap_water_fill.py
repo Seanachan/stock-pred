@@ -94,6 +94,23 @@ def test_aggregate_weights_branch():
     assert wf_out[0, -1] < cash_out[0, -1] - 1e-6, (wf_out[0, -1], cash_out[0, -1])
 
 
+def test_deploy_walkforward_parity():
+    from RL.walk_forward_dl_ensemble import aggregate_weights
+    rng = np.random.default_rng(3)
+    seeds = [rng.dirichlet(np.ones(47))[None, :] for _ in range(5)]  # (1, N+1)
+    scores = [0.21, 0.34, 0.29, 0.30, 0.25]
+    wf = aggregate_weights(seeds, per_seed_scores=scores, cap=0.10,
+                           cap_overflow="waterfill")[0]
+    # deploy-side math: same sharpe-weight, clip, renorm, water-fill
+    stacked = np.stack([s[0] for s in seeds])
+    sc = np.asarray(scores)
+    ws = np.exp(sc - sc.max()); ws /= ws.sum()
+    agg = (stacked * ws[:, None]).sum(0)
+    agg = np.clip(agg, 0.0, None); agg /= agg.sum()
+    deploy = cap_water_fill_np(agg, 0.10)
+    assert np.abs(wf - deploy).max() < 1e-9, np.abs(wf - deploy).max()
+
+
 if __name__ == "__main__":
     test_simplex_and_cap()
     test_no_overflow_unchanged()
@@ -102,4 +119,5 @@ if __name__ == "__main__":
     test_torch_differentiable()
     test_net_cap_renorm_branch()
     test_aggregate_weights_branch()
+    test_deploy_walkforward_parity()
     print("PASS cap_water_fill")

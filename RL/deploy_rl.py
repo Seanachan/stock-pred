@@ -36,7 +36,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 import RL.env  # noqa: F401  registers TradingEnv-v0
 from RL.constant import stock_ids
-from RL.dl_portfolio import PortfolioNetLSTM
+from RL.dl_portfolio import PortfolioNetLSTM, cap_water_fill_np
 from RL.feature import FeatureExtractor
 from stock_api import Buy_Stock, Get_User_Stocks, Sell_Stock, get_taiwan_stock_data
 
@@ -598,6 +598,7 @@ def predict_dl_ensemble_weights(
     per_seed = []
     per_seed_scores = []
     cap = None
+    cap_overflow = "cash"
     for p in checkpoint_paths:
         w = predict_dl_weights(p, stock_data, obs_date)
         per_seed.append(w.astype(np.float64))
@@ -605,6 +606,7 @@ def predict_dl_ensemble_weights(
         per_seed_scores.append(float(ckpt.get("val_sharpe", 0.0)))
         if cap is None:
             cap = float(ckpt["config"].get("max_weight", 0.10))
+            cap_overflow = ckpt["config"].get("cap_overflow", "cash")
     stacked = np.stack(per_seed)  # (n_seeds, N+1)
 
     scores = np.asarray(per_seed_scores, dtype=np.float64)
@@ -621,9 +623,12 @@ def predict_dl_ensemble_weights(
     agg /= s
 
     N = len(stock_ids)
-    excess = float(np.sum(np.maximum(agg[:N] - cap, 0.0)))
-    agg[:N] = np.minimum(agg[:N], cap)
-    agg[N] += excess
+    if cap_overflow == "waterfill":
+        agg = cap_water_fill_np(agg, cap)
+    else:
+        excess = float(np.sum(np.maximum(agg[:N] - cap, 0.0)))
+        agg[:N] = np.minimum(agg[:N], cap)
+        agg[N] += excess
     print(
         f"  v5 ensemble (n={len(per_seed)}): "
         f"max stock={agg[:N].max():.4f}, cash={agg[N]:.4f}, "
@@ -677,6 +682,7 @@ def predict_dl_weights(checkpoint_path: str, stock_data: dict, obs_date) -> np.n
         max_weight=cfg["max_weight"],
         use_sparsemax=cfg.get("use_sparsemax", False),
         emb_dim=cfg.get("emb_dim", 4),  # v5 default; v4 ckpts won't load anyway
+        cap_overflow=cfg.get("cap_overflow", "cash"),
     )
     net.load_state_dict(ckpt["state_dict"])
     net.eval()
