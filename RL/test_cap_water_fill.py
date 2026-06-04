@@ -64,10 +64,28 @@ def test_torch_differentiable():
     assert w.grad is not None and torch.isfinite(w.grad).all()
 
 
+def test_net_cap_renorm_branch():
+    from RL.dl_portfolio import PortfolioNetLSTM
+    # 20 stocks + cash; one stock at 0.30 (over cap), deliberate cash = 0.10
+    w = torch.tensor(_concentrated(n_stocks=20, cash=0.10, spike=0.30, seed=6))
+    net_cash = PortfolioNetLSTM(num_stocks=20, feat_per_stock=14,
+                                max_weight=0.10, cap_overflow="cash")
+    net_wf = PortfolioNetLSTM(num_stocks=20, feat_per_stock=14,
+                              max_weight=0.10, cap_overflow="waterfill")
+    out_cash = net_cash._cap_renorm(w)
+    out_wf = net_wf._cap_renorm(w)
+    # legacy dumps the ~0.20 overflow to cash -> cash > 0.10
+    assert out_cash[0, -1].item() > 0.10 + 1e-6, out_cash[0, -1].item()
+    # water-fill keeps deliberate cash ~0.10
+    assert abs(out_wf[0, -1].item() - 0.10) < 1e-6, out_wf[0, -1].item()
+    assert (out_wf[0, :20] <= 0.10 + 1e-9).all()
+
+
 if __name__ == "__main__":
     test_simplex_and_cap()
     test_no_overflow_unchanged()
     test_overflow_goes_to_stocks_not_cash()
     test_torch_numpy_parity()
     test_torch_differentiable()
+    test_net_cap_renorm_branch()
     print("PASS cap_water_fill")

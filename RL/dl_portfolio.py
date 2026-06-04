@@ -217,7 +217,8 @@ class PortfolioNetLSTM(nn.Module):
 
     def __init__(self, num_stocks: int, feat_per_stock: int = 14,
                  window_len: int = 50, hidden: int = 64, max_weight: float = 0.10,
-                 use_sparsemax: bool = False, emb_dim: int = 4):
+                 use_sparsemax: bool = False, emb_dim: int = 4,
+                 cap_overflow: str = "cash"):
         super().__init__()
         self.N = num_stocks
         self.F = feat_per_stock
@@ -225,6 +226,7 @@ class PortfolioNetLSTM(nn.Module):
         self.emb_dim = emb_dim
         self.max_weight = max_weight
         self.use_sparsemax = use_sparsemax
+        self.cap_overflow = cap_overflow  # "cash" (legacy) | "waterfill"
 
         # v5: per-stock learnable embedding breaks permutation-equivariance,
         # so the model can learn "TSMC ≠ 1101". Stock index aligns with
@@ -254,6 +256,8 @@ class PortfolioNetLSTM(nn.Module):
         return weights
 
     def _cap_renorm(self, w: torch.Tensor) -> torch.Tensor:
+        if self.cap_overflow == "waterfill":
+            return cap_water_fill_torch(w, self.max_weight)
         N = self.N
         stock = w[:, :N]
         cash = w[:, N:]
