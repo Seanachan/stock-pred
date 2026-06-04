@@ -104,11 +104,25 @@ def test_deploy_walkforward_parity():
     # deploy-side math: same sharpe-weight, clip, renorm, water-fill
     stacked = np.stack([s[0] for s in seeds])
     sc = np.asarray(scores)
-    ws = np.exp(sc - sc.max()); ws /= ws.sum()
+    ws = np.exp(sc - sc.max())
+    ws /= ws.sum()
     agg = (stacked * ws[:, None]).sum(0)
-    agg = np.clip(agg, 0.0, None); agg /= agg.sum()
+    agg = np.clip(agg, 0.0, None)
+    agg /= agg.sum()
     deploy = cap_water_fill_np(agg, 0.10)
     assert np.abs(wf - deploy).max() < 1e-9, np.abs(wf - deploy).max()
+
+
+def test_residual_to_cash():
+    # 5 stocks each 0.19 (all > cap 0.10), cash 0.05. Max investable = 5*0.10 =
+    # 0.50 < 0.95 stock mass, so 0.45 must spill to cash -> cash 0.50.
+    w = np.array([[0.19, 0.19, 0.19, 0.19, 0.19, 0.05]])
+    out = cap_water_fill_np(w, 0.10)
+    assert (out[0, :5] <= 0.10 + 1e-9).all(), out[0, :5]
+    assert abs(out.sum() - 1.0) < 1e-9
+    assert abs(out[0, -1] - 0.50) < 1e-9, out[0, -1]
+    b = cap_water_fill_torch(torch.from_numpy(w), 0.10).numpy()
+    assert np.abs(out - b).max() < 1e-6, np.abs(out - b).max()
 
 
 if __name__ == "__main__":
@@ -120,4 +134,5 @@ if __name__ == "__main__":
     test_net_cap_renorm_branch()
     test_aggregate_weights_branch()
     test_deploy_walkforward_parity()
+    test_residual_to_cash()
     print("PASS cap_water_fill")

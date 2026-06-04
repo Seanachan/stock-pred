@@ -121,6 +121,9 @@ def cap_water_fill_np(w: np.ndarray, cap: float, n_iters: int = 8) -> np.ndarray
         safe_pool = np.where(pool > 0, pool, 1.0)
         add = np.where(below & (pool > 0), excess * stock / safe_pool, 0.0)
         stock = stock + add
+    # n_iters=8 converges for the production regime (~46 stocks, cap=0.10); a
+    # final clamp makes the cap structural rather than iteration-count-dependent.
+    stock = np.minimum(stock, cap)
     residual = np.maximum(stock_mass - stock.sum(axis=-1, keepdims=True), 0.0)
     return np.concatenate([stock, cash + residual], axis=-1)
 
@@ -142,6 +145,7 @@ def cap_water_fill_torch(w: torch.Tensor, cap: float, n_iters: int = 8) -> torch
         add = below * excess * stock / safe_pool
         add = torch.where(pool > 0, add, torch.zeros_like(add))
         stock = stock + add
+    stock = torch.clamp(stock, max=cap)  # structural cap (see np twin)
     residual = torch.clamp(stock_mass - stock.sum(dim=-1, keepdim=True), min=0.0)
     return torch.cat([stock, cash + residual], dim=-1)
 
@@ -449,6 +453,7 @@ def train_one_fold_lstm(
     use_sparsemax: bool = False,
     entropy_lambda: float = 0.0,
     train_recent_days: int = 500,
+    cap_overflow: str = "cash",
     device: str = "cpu",
     log_every: int = 50,
     seed: int = 0,
@@ -474,7 +479,7 @@ def train_one_fold_lstm(
         hidden=hidden,
         max_weight=max_weight,
         use_sparsemax=use_sparsemax,
-        cap_overflow="waterfill",
+        cap_overflow=cap_overflow,
     ).to(device)
     opt = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
 

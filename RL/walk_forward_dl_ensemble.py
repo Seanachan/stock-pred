@@ -128,6 +128,7 @@ def run_fold(
             use_sparsemax=False,
             entropy_lambda=0.0,
             train_recent_days=train_recent,
+            cap_overflow="waterfill",
             device=device,
             log_every=max(epochs, 1),  # quiet per-epoch logs
             seed=s,
