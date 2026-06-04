@@ -20,7 +20,7 @@ import pandas as pd
 import torch
 
 from RL.constant import stock_ids
-from RL.dl_portfolio import realized_returns, train_one_fold_lstm
+from RL.dl_portfolio import cap_water_fill_np, realized_returns, train_one_fold_lstm
 from RL.feature import FeatureExtractor
 from RL.walk_forward_dl import FOLDS, load_data
 
@@ -33,6 +33,7 @@ def aggregate_weights(
     per_seed_weights: list[np.ndarray],
     per_seed_scores: list[float] | None = None,
     cap: float = 0.10,
+    cap_overflow: str = "cash",
 ) -> np.ndarray:
     """Sharpe-weighted-mean across seeds, renormalize, re-cap.
 
@@ -70,6 +71,8 @@ def aggregate_weights(
         agg[degenerate] = 0.0
         agg[degenerate, -1] = 1.0
 
+    if cap_overflow == "waterfill":
+        return cap_water_fill_np(agg, cap)
     N = agg.shape[1] - 1
     stocks = agg[:, :N]
     excess = np.maximum(stocks - cap, 0.0).sum(axis=1)  # (T,)
@@ -147,7 +150,8 @@ def run_fold(
         raise RuntimeError(f"seed weight shapes diverged: {shapes}")
 
     agg = aggregate_weights(
-        per_seed_w, per_seed_scores=per_seed_val_sharpe, cap=max_weight
+        per_seed_w, per_seed_scores=per_seed_val_sharpe, cap=max_weight,
+        cap_overflow="waterfill",
     )
     agg_t = torch.from_numpy(agg.astype(np.float32))
     rets_t = torch.from_numpy(rets_v_y.astype(np.float32))

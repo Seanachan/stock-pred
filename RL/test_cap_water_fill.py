@@ -81,6 +81,19 @@ def test_net_cap_renorm_branch():
     assert (out_wf[0, :20] <= 0.10 + 1e-9).all()
 
 
+def test_aggregate_weights_branch():
+    from RL.walk_forward_dl_ensemble import aggregate_weights
+    # 2 seeds, 1 timestep, 20 stocks + cash. Both spike stock 0 over cap.
+    s0 = _concentrated(n_stocks=20, cash=0.10, spike=0.30, seed=7)  # (1, 21)
+    s1 = _concentrated(n_stocks=20, cash=0.10, spike=0.28, seed=8)
+    cash_out = aggregate_weights([s0, s1], cap=0.10, cap_overflow="cash")
+    wf_out = aggregate_weights([s0, s1], cap=0.10, cap_overflow="waterfill")
+    assert (wf_out[:, :20] <= 0.10 + 1e-9).all()
+    assert np.allclose(wf_out.sum(-1), 1.0)
+    # water-fill parks less in cash than legacy (averaged spike ~0.29 > cap)
+    assert wf_out[0, -1] < cash_out[0, -1] - 1e-6, (wf_out[0, -1], cash_out[0, -1])
+
+
 if __name__ == "__main__":
     test_simplex_and_cap()
     test_no_overflow_unchanged()
@@ -88,4 +101,5 @@ if __name__ == "__main__":
     test_torch_numpy_parity()
     test_torch_differentiable()
     test_net_cap_renorm_branch()
+    test_aggregate_weights_branch()
     print("PASS cap_water_fill")
