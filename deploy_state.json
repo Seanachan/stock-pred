@@ -1,14 +1,14 @@
 {
-  "day_count": 12,
+  "day_count": 13,
   "initial_cash": 100000000,
-  "cash_balance": 79366439.01500003,
+  "cash_balance": 74804948.14000003,
   "inventory": {
     "2330": 0,
     "2317": 0,
-    "2454": 1000,
+    "2454": 2000,
     "2308": 0,
     "2382": 0,
-    "2303": 23000,
+    "2303": 24000,
     "5347": 0,
     "8046": 0,
     "2474": 0,
@@ -1146,32 +1146,35 @@
       "port_val_before": 89007157.49000002,
       "port_val_after": 88993439.01500003,
       "drawdown": 0.0
+    },
+    {
+      "date": "2026-06-02",
+      "actions": [
+        {
+          "sid": "2454",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 4430.0,
+          "weight": 0.10000000000000002,
+          "resp": "PAPER",
+          "ok": true
+        },
+        {
+          "sid": "2303",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 125.0,
+          "weight": 0.035055543563563815,
+          "resp": "PAPER",
+          "ok": true
+        }
+      ],
+      "port_val_before": 88993439.01500003,
+      "port_val_after": 89098448.14000003,
+      "drawdown": 0.00015412777339322755
     }
   ],
-  "pending_fills": [
-    {
-      "sid": "2454",
-      "action": "BUY",
-      "shares": 1000,
-      "price": 4525.0
-    },
-    {
-      "sid": "2303",
-      "action": "BUY",
-      "shares": 23000,
-      "price": 141.5
-    },
-    {
-      "sid": "2881",
-      "action": "BUY",
-      "shares": 1000,
-      "price": 113.5
-    },
-    {
-      "sid": "6415",
-      "action": "BUY",
-      "shares": 3000,
-      "price": 578.0
-    }
-  ]
+  "pending_fills": []
 }
