@@ -117,6 +117,7 @@ def main():
             max_weight=args.max_weight,
             use_sparsemax=False,
             emb_dim=args.emb_dim,
+            cap_overflow="waterfill",
         ).to(device)
         opt = torch.optim.Adam(net.parameters(), lr=args.lr, weight_decay=1e-5)
 
@@ -160,6 +161,7 @@ def main():
                 "max_weight": args.max_weight,
                 "use_sparsemax": False,
                 "emb_dim": args.emb_dim,
+                "cap_overflow": "waterfill",
             },
             "stock_ids": stock_ids,
             "feat_cols": tr["feat_cols"],

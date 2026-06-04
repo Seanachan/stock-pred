@@ -474,6 +474,7 @@ def train_one_fold_lstm(
         hidden=hidden,
         max_weight=max_weight,
         use_sparsemax=use_sparsemax,
+        cap_overflow="waterfill",
     ).to(device)
     opt = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
 
