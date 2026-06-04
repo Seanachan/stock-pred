@@ -151,3 +151,19 @@ How each site obtains the flag:
   count and smooth ops; watch train Sharpe curves on the smoke fold.
 - **No alpha lift**: cash may not be the dominant drag. Acceptance gate catches
   this; fallback is the raise-cap probe or revisiting the feature set.
+
+## Result (2026-06-04)
+
+5-seed × 10-fold walk-forward, `--tag v5_waterfill`, deployed sharpe-weighted aggregation:
+
+- **mean alpha = +4.27%** (beats v4 5-seed +0.98% and v4 single-seed +4.09% — the chosen target). median alpha = +2.63%. 6/10 positive. std(alpha) = 18.0%.
+- mean cash = 2.5%, mean active = 25.9.
+- Cash drag eliminated (pre-fix v5 ~48% → 2.5%); failing-v5 mean alpha ~−1.9% → +4.27%.
+- Aggregation-robust: uniform +4.09%, median +5.41% (all beat +0.98%).
+
+**Caveats (do not overclaim):**
+- The +4.27% mean is dominated by fold 4 (+53.7%); excluding it, mean = −1.21%. The robust central number is the median, +2.63% — beats v4 5-seed but not single-seed.
+- Near-zero cash (2.5%, below the [5,40] design band) means the book is ~always fully invested — no defensive cash. `active` drifted 16→26 (more EW-like). Water-fill over-corrected slightly.
+- The strict original gate still fails (6/10 < 7, std 18% > 8%, active > 20, cash < 5%) — but that gate was explicitly out of scope this round.
+
+**Verdict:** passes the chosen "beat v4 OOS alpha" bar on mean and median; genuine improvement, but one-fold-dependent and high-variance. Ship decision deferred to human review. Artifacts: `walk_forward_v5_waterfill_results.json`, `walk_forward_v5_waterfill_cache.pkl`, `logs/v5_waterfill_wf.log`.
