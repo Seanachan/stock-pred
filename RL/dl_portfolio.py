@@ -180,6 +180,25 @@ def cap_water_fill_torch(w: torch.Tensor, cap: float, n_iters: int = 8,
     return torch.cat([stock, cash + residual], dim=-1)
 
 
+def ensemble_topn_truncate(agg: np.ndarray, top_n: int | None) -> np.ndarray:
+    """Keep the top_n highest-weighted stocks per row (zero the rest), then
+    renormalize so survivors + cash sum to 1. Cash slot (index -1) is never
+    zeroed. Returns same shape. Apply to AGGREGATED ensemble weights BEFORE the
+    cap step. top_n=None (or >= n_stocks) is a no-op.
+    """
+    if top_n is None:
+        return agg
+    agg = np.asarray(agg, dtype=np.float64).copy()
+    n_stocks = agg.shape[-1] - 1
+    if top_n >= n_stocks:
+        return agg
+    stock = agg[..., :-1]
+    kth = np.sort(stock, axis=-1)[..., -top_n][..., None]  # top_n-th largest/row
+    agg[..., :-1] = stock * (stock >= kth)
+    agg /= agg.sum(axis=-1, keepdims=True)
+    return agg
+
+
 class PortfolioNet(nn.Module):
     """Per-asset shared encoder → score → softmax/sparsemax over (N+1) weights.
 

@@ -56,6 +56,7 @@ def main():
     parser.add_argument("--hidden", type=int, default=32)
     parser.add_argument("--max-weight", type=float, default=0.10)
     parser.add_argument("--cap-top-k", type=int, default=None)
+    parser.add_argument("--ensemble-top-n", type=int, default=None)
     parser.add_argument("--train-recent", type=int, default=500)
     parser.add_argument("--out", default="models/dl_v5_deploy.pt")
     parser.add_argument("--emb-dim", type=int, default=4,
@@ -165,6 +166,7 @@ def main():
                 "emb_dim": args.emb_dim,
                 "cap_overflow": "waterfill",
                 "cap_top_k": args.cap_top_k,
+                "ensemble_top_n": args.ensemble_top_n,
             },
             "stock_ids": stock_ids,
             "feat_cols": tr["feat_cols"],

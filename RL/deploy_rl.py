@@ -36,7 +36,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 import RL.env  # noqa: F401  registers TradingEnv-v0
 from RL.constant import stock_ids
-from RL.dl_portfolio import PortfolioNetLSTM, cap_water_fill_np
+from RL.dl_portfolio import PortfolioNetLSTM, cap_water_fill_np, ensemble_topn_truncate
 from RL.feature import FeatureExtractor
 from stock_api import Buy_Stock, Get_User_Stocks, Sell_Stock, get_taiwan_stock_data
 
@@ -600,6 +600,7 @@ def predict_dl_ensemble_weights(
     cap = None
     cap_overflow = "cash"
     cap_top_k = None
+    ensemble_top_n = None
     for p in checkpoint_paths:
         w = predict_dl_weights(p, stock_data, obs_date)
         per_seed.append(w.astype(np.float64))
@@ -609,6 +610,7 @@ def predict_dl_ensemble_weights(
             cap = float(ckpt["config"].get("max_weight", 0.10))
             cap_overflow = ckpt["config"].get("cap_overflow", "cash")
             cap_top_k = ckpt["config"].get("cap_top_k")
+            ensemble_top_n = ckpt["config"].get("ensemble_top_n")
     stacked = np.stack(per_seed)  # (n_seeds, N+1)
 
     scores = np.asarray(per_seed_scores, dtype=np.float64)
@@ -625,6 +627,7 @@ def predict_dl_ensemble_weights(
     agg /= s
 
     N = len(stock_ids)
+    agg = ensemble_topn_truncate(agg, ensemble_top_n)
     if cap_overflow == "waterfill":
         agg = cap_water_fill_np(agg, cap, top_k=cap_top_k)
     else:

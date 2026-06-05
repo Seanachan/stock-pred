@@ -4,7 +4,7 @@
 import numpy as np
 import torch
 
-from RL.dl_portfolio import cap_water_fill_np, cap_water_fill_torch
+from RL.dl_portfolio import cap_water_fill_np, cap_water_fill_torch, ensemble_topn_truncate
 
 
 def _softmax_rows(shape, seed):
@@ -145,6 +145,24 @@ def test_top_k_concentration():
     assert np.abs(out_k - b).max() < 1e-6, np.abs(out_k - b).max()
 
 
+def test_ensemble_topn_truncate():
+    rng = np.random.default_rng(21)
+    w = rng.dirichlet(np.ones(47), size=(6,))  # (6, 47): 46 stocks + cash, rows sum 1
+    out = ensemble_topn_truncate(w, top_n=15)
+    n = w.shape[-1] - 1
+    assert np.allclose(out.sum(-1), 1.0, atol=1e-9)
+    # at most 15 stocks nonzero per row
+    assert (np.count_nonzero(out[:, :n], axis=1) <= 15).all(), np.count_nonzero(out[:, :n], axis=1)
+    # the kept stocks are exactly the top-15 of the input
+    for i in range(w.shape[0]):
+        top15 = set(np.argsort(-w[i, :n])[:15])
+        kept = set(np.nonzero(out[i, :n])[0])
+        assert kept <= top15, (i, kept - top15)
+    # None and >= n_stocks are no-ops
+    assert np.array_equal(ensemble_topn_truncate(w, None), w)
+    assert np.array_equal(ensemble_topn_truncate(w, 999), w)
+
+
 if __name__ == "__main__":
     test_simplex_and_cap()
     test_no_overflow_unchanged()
@@ -156,4 +174,5 @@ if __name__ == "__main__":
     test_deploy_walkforward_parity()
     test_residual_to_cash()
     test_top_k_concentration()
+    test_ensemble_topn_truncate()
     print("PASS cap_water_fill")

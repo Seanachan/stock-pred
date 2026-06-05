@@ -20,7 +20,7 @@ import pandas as pd
 import torch
 
 from RL.constant import stock_ids
-from RL.dl_portfolio import cap_water_fill_np, realized_returns, train_one_fold_lstm
+from RL.dl_portfolio import cap_water_fill_np, ensemble_topn_truncate, realized_returns, train_one_fold_lstm
 from RL.feature import FeatureExtractor
 from RL.walk_forward_dl import FOLDS, load_data
 
@@ -35,6 +35,7 @@ def aggregate_weights(
     cap: float = 0.10,
     cap_overflow: str = "cash",
     cap_top_k: int | None = None,
+    ensemble_top_n: int | None = None,
 ) -> np.ndarray:
     """Sharpe-weighted-mean across seeds, renormalize, re-cap.
 
@@ -72,6 +73,8 @@ def aggregate_weights(
         agg[degenerate] = 0.0
         agg[degenerate, -1] = 1.0
 
+    agg = ensemble_topn_truncate(agg, ensemble_top_n)
+
     if cap_overflow == "waterfill":
         return cap_water_fill_np(agg, cap, top_k=cap_top_k)
     N = agg.shape[1] - 1
@@ -96,6 +99,7 @@ def run_fold(
     train_recent: int,
     max_weight: float,
     cap_top_k: int | None = None,
+    ensemble_top_n: int | None = None,
     device: str = "cpu",
     fe: FeatureExtractor = None,
 ) -> dict:
@@ -157,6 +161,7 @@ def run_fold(
         per_seed_w, per_seed_scores=per_seed_val_sharpe, cap=max_weight,
         cap_overflow="waterfill",
         cap_top_k=cap_top_k,
+        ensemble_top_n=ensemble_top_n,
     )
     agg_t = torch.from_numpy(agg.astype(np.float32))
     rets_t = torch.from_numpy(rets_v_y.astype(np.float32))
@@ -202,6 +207,7 @@ if __name__ == "__main__":
     parser.add_argument("--train-recent", type=int, default=500)
     parser.add_argument("--max-weight", type=float, default=0.10)
     parser.add_argument("--cap-top-k", type=int, default=None)
+    parser.add_argument("--ensemble-top-n", type=int, default=None)
     parser.add_argument("--fold-start", type=int, default=0)
     parser.add_argument("--fold-end", type=int, default=len(FOLDS))
     args = parser.parse_args()
@@ -231,6 +237,7 @@ if __name__ == "__main__":
             train_recent=args.train_recent,
             max_weight=args.max_weight,
             cap_top_k=args.cap_top_k,
+            ensemble_top_n=args.ensemble_top_n,
             device=device,
             fe=fe,
         )
