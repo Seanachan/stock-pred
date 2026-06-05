@@ -186,3 +186,31 @@ keeping the cash-drag fix.
 - Validation: smoke (active drops toward band) → 5-seed×10-fold acceptance
   (`--tag v5_topk10`). Keep if mean alpha still beats v4 (+0.98%) with active in
   [6,20]; if mean alpha drops below v4, revert to plain water-fill.
+
+## Result — top-N refinement (2026-06-05)
+
+Per-seed top-K (`cap_top_k`) was a dead end: it can't reduce ensemble breadth
+(active stays ~23) because breadth is driven by cross-seed disagreement, not
+overflow. Pivoted to **hard top-N truncation on the aggregated book**
+(`ensemble_top_n`): keep the N highest-weighted stocks, zero the rest, renorm,
+then water-fill cap. Applied identically in `aggregate_weights` (eval) and
+`predict_dl_ensemble_weights` (deploy) via shared `ensemble_topn_truncate`;
+parity verified (max|eval−deploy| = 0.0).
+
+Offline N-sweep on `walk_forward_v5_waterfill_cache.pkl` (faithful OOS — top-N is
+post-aggregation, training unchanged):
+
+| top_n | mean α | median α | pos | mean cash | mean active |
+|---|---|---|---|---|---|
+| none | +4.27% | +2.63% | 6/10 | 2.5% | 25.9 |
+| 20 | +5.52% | +2.17% | 7/10 | 2.7% | 20.0 |
+| **15** | **+6.96%** | **+2.71%** | **7/10** | 3.1% | **15.0** |
+| 12 | +7.07% | +2.16% | 6/10 | 3.4% | 12.0 |
+| 10 | +6.18% | +0.56% | 5/10 | 3.8% | 10.0 |
+
+**Chosen: N=15.** mean alpha +6.96% (vs plain +4.27%, v4 +0.98% / single +4.09%),
+median +2.71%, **7/10 positive**, active 15.0 (in band). Concentration removes
+low-conviction names that diluted the book; over-concentration (N≤10) collapses
+the median. std still ~24% (fold-4-lifted mean; median +2.71% is the robust
+figure and still beats v4 5-seed). Best result of the effort. NOT yet shipped —
+ship needs a v5 retrain (deploy ckpts) + CI cutover, pending human decision.
