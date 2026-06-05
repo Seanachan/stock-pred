@@ -97,7 +97,8 @@ def sparsemax(z: torch.Tensor, dim: int = -1) -> torch.Tensor:
     return torch.clamp(z - tau, min=0)
 
 
-def cap_water_fill_np(w: np.ndarray, cap: float, n_iters: int = 8) -> np.ndarray:
+def cap_water_fill_np(w: np.ndarray, cap: float, n_iters: int = 8,
+                      top_k: int | None = None) -> np.ndarray:
     """Redistribute per-stock weight above `cap` to below-cap stocks,
     proportional to their current weight (conviction-preserving). The cash
     slot at index -1 is preserved; only residual overflow that cannot fit
@@ -106,17 +107,32 @@ def cap_water_fill_np(w: np.ndarray, cap: float, n_iters: int = 8) -> np.ndarray
     w: (..., N+1) rows summing to 1 (stocks + cash). Returns same shape with
     every stock <= cap, rows still summing to 1, output cash >= input cash.
     Masked / zero-weight stocks receive nothing (share proportional to weight = 0).
+
+    top_k: if set, overflow is redistributed only to the top_k highest-weighted
+    below-cap stocks (by initial weight, fixed across iterations); the rest of
+    the tail receives nothing and overflow the top_k cannot absorb falls to
+    cash. None = all below-cap stocks are eligible (no concentration).
     """
     w = np.asarray(w, dtype=np.float64).copy()
     stock = w[..., :-1]
     cash = w[..., -1:]
     stock_mass = stock.sum(axis=-1, keepdims=True)
+    recipients = None
+    if top_k is not None and top_k < stock.shape[-1]:
+        elig = stock < cap
+        masked = np.where(elig, stock, -np.inf)
+        idx = np.argsort(-masked, axis=-1)[..., :top_k]
+        recipients = np.zeros_like(elig)
+        np.put_along_axis(recipients, idx, True, axis=-1)
+        recipients &= elig
     for _ in range(n_iters):
         excess = np.maximum(stock - cap, 0.0).sum(axis=-1, keepdims=True)
         if not np.any(excess > 1e-12):
             break
         stock = np.minimum(stock, cap)
         below = stock < cap
+        if recipients is not None:
+            below = below & recipients
         pool = (stock * below).sum(axis=-1, keepdims=True)
         safe_pool = np.where(pool > 0, pool, 1.0)
         add = np.where(below & (pool > 0), excess * stock / safe_pool, 0.0)
@@ -128,21 +144,35 @@ def cap_water_fill_np(w: np.ndarray, cap: float, n_iters: int = 8) -> np.ndarray
     return np.concatenate([stock, cash + residual], axis=-1)
 
 
-def cap_water_fill_torch(w: torch.Tensor, cap: float, n_iters: int = 8) -> torch.Tensor:
+def cap_water_fill_torch(w: torch.Tensor, cap: float, n_iters: int = 8,
+                         top_k: int | None = None) -> torch.Tensor:
     """Differentiable torch twin of cap_water_fill_np (fixed iteration count).
 
     Same rule; backprops via clamp/min/division (subgradient at the cap edge).
+    `top_k` matches the numpy twin: overflow goes only to the top_k
+    highest-weighted below-cap stocks (fixed recipient set by initial weight).
     """
     stock = w[..., :-1]
     cash = w[..., -1:]
     stock_mass = stock.sum(dim=-1, keepdim=True)
+    recipients = None
+    if top_k is not None and top_k < stock.shape[-1]:
+        elig = stock < cap
+        masked = torch.where(elig, stock, torch.full_like(stock, float("-inf")))
+        idx = masked.topk(top_k, dim=-1).indices
+        recipients = torch.zeros_like(elig)
+        recipients.scatter_(-1, idx, True)
+        recipients = recipients & elig
     for _ in range(n_iters):
         excess = torch.clamp(stock - cap, min=0.0).sum(dim=-1, keepdim=True)
         stock = torch.clamp(stock, max=cap)
-        below = (stock < cap).to(stock.dtype)
-        pool = (stock * below).sum(dim=-1, keepdim=True)
+        below = stock < cap
+        if recipients is not None:
+            below = below & recipients
+        below_f = below.to(stock.dtype)
+        pool = (stock * below_f).sum(dim=-1, keepdim=True)
         safe_pool = torch.where(pool > 0, pool, torch.ones_like(pool))
-        add = below * excess * stock / safe_pool
+        add = below_f * excess * stock / safe_pool
         add = torch.where(pool > 0, add, torch.zeros_like(add))
         stock = stock + add
     stock = torch.clamp(stock, max=cap)  # structural cap (see np twin)

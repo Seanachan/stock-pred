@@ -125,6 +125,26 @@ def test_residual_to_cash():
     assert np.abs(out - b).max() < 1e-6, np.abs(out - b).max()
 
 
+def test_top_k_concentration():
+    rng = np.random.default_rng(11)
+    # 30 stocks: one spike over cap + diffuse tail; cash 0.05
+    tail = rng.dirichlet(np.ones(29)) * (1.0 - 0.05 - 0.40)
+    w = np.concatenate([[0.40], tail, [0.05]])[None, :]  # (1, 31): 30 stocks + cash
+    out_k = cap_water_fill_np(w, 0.10, top_k=5)
+    out_all = cap_water_fill_np(w, 0.10, top_k=None)
+    # cap + simplex invariants hold under top_k
+    assert (out_k[0, :30] <= 0.10 + 1e-9).all(), out_k[0, :30].max()
+    assert abs(out_k.sum() - 1.0) < 1e-9
+    # at most top_k stocks gained weight; all-recipients spreads strictly wider
+    gained_k = int(((out_k[0, :30] - w[0, :30]) > 1e-9).sum())
+    gained_all = int(((out_all[0, :30] - w[0, :30]) > 1e-9).sum())
+    assert gained_k <= 5, gained_k
+    assert gained_all > gained_k, (gained_all, gained_k)
+    # torch/numpy parity with top_k
+    b = cap_water_fill_torch(torch.from_numpy(w), 0.10, top_k=5).numpy()
+    assert np.abs(out_k - b).max() < 1e-6, np.abs(out_k - b).max()
+
+
 if __name__ == "__main__":
     test_simplex_and_cap()
     test_no_overflow_unchanged()
@@ -135,4 +155,5 @@ if __name__ == "__main__":
     test_aggregate_weights_branch()
     test_deploy_walkforward_parity()
     test_residual_to_cash()
+    test_top_k_concentration()
     print("PASS cap_water_fill")
