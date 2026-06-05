@@ -733,6 +733,12 @@ if __name__ == "__main__":
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--status", action="store_true")
     parser.add_argument(
+        "--state",
+        default="deploy_state.json",
+        help="ledger state-file path; use a separate file for paper runs so "
+        "the live ledger is not clobbered",
+    )
+    parser.add_argument(
         "--refresh-data",
         action="store_true",
         help="force-refresh all CSVs from TWSE before predicting",
@@ -748,6 +754,8 @@ if __name__ == "__main__":
         help="only run broker reconcile, then exit",
     )
     args = parser.parse_args()
+
+    STATE_FILE = Path(args.state)  # rebinds module global; load/save_state use it
 
     state = load_state()
 
