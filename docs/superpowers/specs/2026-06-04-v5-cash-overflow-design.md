@@ -167,3 +167,22 @@ How each site obtains the flag:
 - The strict original gate still fails (6/10 < 7, std 18% > 8%, active > 20, cash < 5%) — but that gate was explicitly out of scope this round.
 
 **Verdict:** passes the chosen "beat v4 OOS alpha" bar on mean and median; genuine improvement, but one-fold-dependent and high-variance. Ship decision deferred to human review. Artifacts: `walk_forward_v5_waterfill_results.json`, `walk_forward_v5_waterfill_cache.pkl`, `logs/v5_waterfill_wf.log`.
+
+## Refinement: top-K concentration (2026-06-05)
+
+The water-fill result over-diversified (active 16→26, cash 2.5%). Refinement:
+redistribute cap-overflow only to the **top-K highest-weighted below-cap
+stocks**, leaving the tail at ~0, to pull `active` back into [6,20] while
+keeping the cash-drag fix.
+
+- `cap_water_fill_{np,torch}` gain `top_k: int | None = None` (None = current
+  all-below-cap behavior, backward-compat). The recipient set is the top-K
+  below-cap stocks by **initial** weight, fixed across iterations; overflow that
+  the fixed K cannot absorb (all at cap) falls to cash (residual). This bounds
+  the active set at ~(initially-capped + K).
+- New config key `cap_top_k` (default None), plumbed exactly like `cap_overflow`
+  through the 3 cap sites + train + deploy. Experiment uses **K=10**, exposed as
+  `--cap-top-k` on `dl_train_deploy` and `walk_forward_dl_ensemble`.
+- Validation: smoke (active drops toward band) → 5-seed×10-fold acceptance
+  (`--tag v5_topk10`). Keep if mean alpha still beats v4 (+0.98%) with active in
+  [6,20]; if mean alpha drops below v4, revert to plain water-fill.
