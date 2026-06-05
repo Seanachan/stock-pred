@@ -34,6 +34,7 @@ def aggregate_weights(
     per_seed_scores: list[float] | None = None,
     cap: float = 0.10,
     cap_overflow: str = "cash",
+    cap_top_k: int | None = None,
 ) -> np.ndarray:
     """Sharpe-weighted-mean across seeds, renormalize, re-cap.
 
@@ -72,7 +73,7 @@ def aggregate_weights(
         agg[degenerate, -1] = 1.0
 
     if cap_overflow == "waterfill":
-        return cap_water_fill_np(agg, cap)
+        return cap_water_fill_np(agg, cap, top_k=cap_top_k)
     N = agg.shape[1] - 1
     stocks = agg[:, :N]
     excess = np.maximum(stocks - cap, 0.0).sum(axis=1)  # (T,)
@@ -94,8 +95,9 @@ def run_fold(
     hidden: int,
     train_recent: int,
     max_weight: float,
-    device: str,
-    fe: FeatureExtractor,
+    cap_top_k: int | None = None,
+    device: str = "cpu",
+    fe: FeatureExtractor = None,
 ) -> dict:
     train_data = load_data(tr_s, tr_e)
     prefix = (
@@ -129,6 +131,7 @@ def run_fold(
             entropy_lambda=0.0,
             train_recent_days=train_recent,
             cap_overflow="waterfill",
+            cap_top_k=cap_top_k,
             device=device,
             log_every=max(epochs, 1),  # quiet per-epoch logs
             seed=s,
@@ -153,6 +156,7 @@ def run_fold(
     agg = aggregate_weights(
         per_seed_w, per_seed_scores=per_seed_val_sharpe, cap=max_weight,
         cap_overflow="waterfill",
+        cap_top_k=cap_top_k,
     )
     agg_t = torch.from_numpy(agg.astype(np.float32))
     rets_t = torch.from_numpy(rets_v_y.astype(np.float32))
@@ -197,6 +201,7 @@ if __name__ == "__main__":
     parser.add_argument("--hidden", type=int, default=32)
     parser.add_argument("--train-recent", type=int, default=500)
     parser.add_argument("--max-weight", type=float, default=0.10)
+    parser.add_argument("--cap-top-k", type=int, default=None)
     parser.add_argument("--fold-start", type=int, default=0)
     parser.add_argument("--fold-end", type=int, default=len(FOLDS))
     args = parser.parse_args()
@@ -225,6 +230,7 @@ if __name__ == "__main__":
             hidden=args.hidden,
             train_recent=args.train_recent,
             max_weight=args.max_weight,
+            cap_top_k=args.cap_top_k,
             device=device,
             fe=fe,
         )

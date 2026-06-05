@@ -599,6 +599,7 @@ def predict_dl_ensemble_weights(
     per_seed_scores = []
     cap = None
     cap_overflow = "cash"
+    cap_top_k = None
     for p in checkpoint_paths:
         w = predict_dl_weights(p, stock_data, obs_date)
         per_seed.append(w.astype(np.float64))
@@ -607,6 +608,7 @@ def predict_dl_ensemble_weights(
         if cap is None:
             cap = float(ckpt["config"].get("max_weight", 0.10))
             cap_overflow = ckpt["config"].get("cap_overflow", "cash")
+            cap_top_k = ckpt["config"].get("cap_top_k")
     stacked = np.stack(per_seed)  # (n_seeds, N+1)
 
     scores = np.asarray(per_seed_scores, dtype=np.float64)
@@ -624,7 +626,7 @@ def predict_dl_ensemble_weights(
 
     N = len(stock_ids)
     if cap_overflow == "waterfill":
-        agg = cap_water_fill_np(agg, cap)
+        agg = cap_water_fill_np(agg, cap, top_k=cap_top_k)
     else:
         excess = float(np.sum(np.maximum(agg[:N] - cap, 0.0)))
         agg[:N] = np.minimum(agg[:N], cap)
@@ -683,6 +685,7 @@ def predict_dl_weights(checkpoint_path: str, stock_data: dict, obs_date) -> np.n
         use_sparsemax=cfg.get("use_sparsemax", False),
         emb_dim=cfg.get("emb_dim", 4),  # v5 default; v4 ckpts won't load anyway
         cap_overflow=cfg.get("cap_overflow", "cash"),
+        cap_top_k=cfg.get("cap_top_k"),
     )
     net.load_state_dict(ckpt["state_dict"])
     net.eval()

@@ -252,7 +252,7 @@ class PortfolioNetLSTM(nn.Module):
     def __init__(self, num_stocks: int, feat_per_stock: int = 14,
                  window_len: int = 50, hidden: int = 64, max_weight: float = 0.10,
                  use_sparsemax: bool = False, emb_dim: int = 4,
-                 cap_overflow: str = "cash"):
+                 cap_overflow: str = "cash", cap_top_k: int | None = None):
         super().__init__()
         self.N = num_stocks
         self.F = feat_per_stock
@@ -261,6 +261,7 @@ class PortfolioNetLSTM(nn.Module):
         self.max_weight = max_weight
         self.use_sparsemax = use_sparsemax
         self.cap_overflow = cap_overflow  # "cash" (legacy) | "waterfill"
+        self.cap_top_k = cap_top_k
 
         # v5: per-stock learnable embedding breaks permutation-equivariance,
         # so the model can learn "TSMC ≠ 1101". Stock index aligns with
@@ -291,7 +292,7 @@ class PortfolioNetLSTM(nn.Module):
 
     def _cap_renorm(self, w: torch.Tensor) -> torch.Tensor:
         if self.cap_overflow == "waterfill":
-            return cap_water_fill_torch(w, self.max_weight)
+            return cap_water_fill_torch(w, self.max_weight, top_k=self.cap_top_k)
         N = self.N
         stock = w[:, :N]
         cash = w[:, N:]
@@ -484,6 +485,7 @@ def train_one_fold_lstm(
     entropy_lambda: float = 0.0,
     train_recent_days: int = 500,
     cap_overflow: str = "cash",
+    cap_top_k: int | None = None,
     device: str = "cpu",
     log_every: int = 50,
     seed: int = 0,
@@ -510,6 +512,7 @@ def train_one_fold_lstm(
         max_weight=max_weight,
         use_sparsemax=use_sparsemax,
         cap_overflow=cap_overflow,
+        cap_top_k=cap_top_k,
     ).to(device)
     opt = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
 
