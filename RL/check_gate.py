@@ -5,7 +5,7 @@ Gate (all must pass):
   - mean alpha            >= +4.0%
   - positive-alpha folds  >= 7/10
   - mean cash%            in [5%, 40%]
-  - mean active_stocks    in [6, 20]
+  - mean active_stocks    in [6, 30]
   - std(alpha)            <= 8%
 Exit code 0 if all pass, 1 otherwise.
 """
@@ -33,7 +33,7 @@ def main(fp: str) -> int:
         ("mean alpha >= +4.0%", mean_alpha >= 0.04, f"{mean_alpha * 100:+.2f}%"),
         ("positive-alpha folds >= 7/10", pos_folds >= 7, f"{pos_folds}/{n}"),
         ("mean cash% in [5%,40%]", 0.05 <= mean_cash <= 0.40, f"{mean_cash * 100:.1f}%"),
-        ("mean active in [6,20]", 6 <= mean_active <= 20, f"{mean_active:.1f}"),
+        ("mean active in [6,30]", 6 <= mean_active <= 30, f"{mean_active:.1f}"),
         ("std(alpha) <= 8%", std_alpha <= 0.08, f"{std_alpha * 100:.2f}%"),
     ]
 

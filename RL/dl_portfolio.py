@@ -97,7 +97,7 @@ def sparsemax(z: torch.Tensor, dim: int = -1) -> torch.Tensor:
     return torch.clamp(z - tau, min=0)
 
 
-def cap_water_fill_np(w: np.ndarray, cap: float, n_iters: int = 8,
+def cap_water_fill_np(w: np.ndarray, cap: float, n_iters: int = 16,
                       top_k: int | None = None) -> np.ndarray:
     """Redistribute per-stock weight above `cap` to below-cap stocks,
     proportional to their current weight (conviction-preserving). The cash
@@ -137,14 +137,14 @@ def cap_water_fill_np(w: np.ndarray, cap: float, n_iters: int = 8,
         safe_pool = np.where(pool > 0, pool, 1.0)
         add = np.where(below & (pool > 0), excess * stock / safe_pool, 0.0)
         stock = stock + add
-    # n_iters=8 converges for the production regime (~46 stocks, cap=0.10); a
+    # n_iters=16 converges for up to ~90 stocks, cap=0.10; a
     # final clamp makes the cap structural rather than iteration-count-dependent.
     stock = np.minimum(stock, cap)
     residual = np.maximum(stock_mass - stock.sum(axis=-1, keepdims=True), 0.0)
     return np.concatenate([stock, cash + residual], axis=-1)
 
 
-def cap_water_fill_torch(w: torch.Tensor, cap: float, n_iters: int = 8,
+def cap_water_fill_torch(w: torch.Tensor, cap: float, n_iters: int = 16,
                          top_k: int | None = None) -> torch.Tensor:
     """Differentiable torch twin of cap_water_fill_np (fixed iteration count).
 

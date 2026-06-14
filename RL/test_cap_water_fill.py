@@ -163,6 +163,21 @@ def test_ensemble_topn_truncate():
     assert np.array_equal(ensemble_topn_truncate(w, 999), w)
 
 
+def test_n90_cap_converges():
+    # 90 stocks, concentrated softmax -> overflow must redistribute and the
+    # cap must hold tightly with the default n_iters at this universe size.
+    rng = np.random.default_rng(90)
+    logits = rng.normal(size=(8, 91)) * 3.0   # 90 stocks + cash, peaky
+    w = np.exp(logits - logits.max(-1, keepdims=True))
+    w /= w.sum(-1, keepdims=True)
+    out = cap_water_fill_np(w, 0.10)           # uses default n_iters
+    assert (out[:, :90] <= 0.10 + 1e-9).all(), out[:, :90].max()
+    assert np.allclose(out.sum(-1), 1.0, atol=1e-9)
+    # residual driven to cash should be tiny when headroom is ample (90*0.10=9.0)
+    leaked = out[:, -1].mean() - w[:, -1].mean()
+    assert leaked < 0.05, leaked   # < 5% unintended cash from non-convergence
+
+
 if __name__ == "__main__":
     test_simplex_and_cap()
     test_no_overflow_unchanged()
@@ -175,4 +190,5 @@ if __name__ == "__main__":
     test_residual_to_cash()
     test_top_k_concentration()
     test_ensemble_topn_truncate()
+    test_n90_cap_converges()
     print("PASS cap_water_fill")
