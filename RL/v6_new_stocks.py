@@ -35,7 +35,9 @@ NEW_STOCKS: list[tuple[str, str]] = [
     ("2347", "聯強"),        # Synnex TW - distribution
     ("1590", "亞德客-KY"),   # Airtac - pneumatic components
     ("5876", "上海商銀"),    # Shanghai Commercial Bank
-    ("6446", "藥華藥"),      # PharmaEngine - biotech
+    # NOTE: 6446 藥華藥 (IPO 2024-01, only ~573 bars) dropped from the universe —
+    # build_tensors intersects dates, so its short history collapsed the aligned
+    # training window (T 440->222). All other names cover the 2020+ window.
     ("3036", "文曄"),        # WPG Holdings - distribution
     ("2409", "友達"),        # AUO - display panels
     ("1402", "遠東新"),      # Far Eastern New Century - textiles
