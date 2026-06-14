@@ -42,7 +42,13 @@ def load_data(start: str, end: str) -> dict:
         df = df.loc[start:end].dropna()
         if len(df) > 30:
             out[sid] = df
-    return out
+    if not out:
+        return {}
+    # Drop stocks covering < 80% of the longest stock's span in this slice, so a
+    # late-IPO / partial-coverage stock can't collapse the date intersection in
+    # build_tensors (which crashes windowize or cripples the training window).
+    max_len = max(len(df) for df in out.values())
+    return {sid: df for sid, df in out.items() if len(df) >= 0.8 * max_len}
 
 
 def main():
