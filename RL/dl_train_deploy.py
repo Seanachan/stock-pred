@@ -151,7 +151,7 @@ def main():
             print(f"  val sharpe (last {VAL_N}d holdout): {val_sharpe:+.3f}")
 
         out_path = (
-            f"models/dl_v5_seed{seed}.pt" if args.seeds else args.out
+            args.out.replace("_deploy.pt", f"_seed{seed}.pt") if args.seeds else args.out
         )
         os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
         torch.save({

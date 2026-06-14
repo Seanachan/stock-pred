@@ -1,17 +1,17 @@
-name: Weekly Retrain v5 LSTM Ensemble (5 seeds)
+name: Daily Retrain v6 LSTM Ensemble (5 seeds)
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 on:
   schedule:
-    # Sunday 01:00 UTC = Sunday 09:00 TW. Daily deploy committed
-    # CSVs through Friday close, so training window is fully fresh by then.
-    - cron: "0 1 * * 0"
+    # 01:00 UTC = 09:00 TW weekdays. Daily deploy committed
+    # CSVs through prior close, so training window is fully fresh by then.
+    - cron: "0 1 * * 1-5"
   workflow_dispatch: {}
 
 concurrency:
-  group: retrain-v5
+  group: retrain-v6
   cancel-in-progress: false
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    timeout-minutes: 90
+    timeout-minutes: 120
 
     steps:
       - name: Checkout
@@ -38,7 +38,7 @@ jobs:
       - name: Install dependencies
         run: uv pip install -r requirements.txt
 
-      - name: Train v5 LSTM 5-seed ensemble
+      - name: Train v6 LSTM 5-seed ensemble
         run: |
           uv run python -m RL.dl_train_deploy \
             --epochs 500 \
@@ -47,6 +47,8 @@ jobs:
             --hidden 32 \
             --max-weight 0.10 \
             --emb-dim 4 \
+            --ensemble-top-n 15 \
+            --out models/dl_v6_deploy.pt \
             --seeds 0,1,2,3,4
 
       - name: Commit refreshed ensemble
@@ -54,9 +56,9 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add models/dl_v5_seed*.pt
+          git add models/dl_v6_seed*.pt
           if ! git diff --cached --quiet; then
-            git commit -m "retrain: v5 LSTM 5-seed ensemble $(date -u +%Y-%m-%d)"
+            git commit -m "retrain: v6 LSTM 5-seed ensemble $(date -u +%Y-%m-%d)"
             git push
           else
             echo "models unchanged; skipping commit"

@@ -54,11 +54,11 @@ jobs:
         run: |
           MODE="${{ github.event.inputs.mode || 'live' }}"
           ENSEMBLE="--dl-ensemble \
-            models/dl_v5_seed0.pt \
-            models/dl_v5_seed1.pt \
-            models/dl_v5_seed2.pt \
-            models/dl_v5_seed3.pt \
-            models/dl_v5_seed4.pt"
+            models/dl_v6_seed0.pt \
+            models/dl_v6_seed1.pt \
+            models/dl_v6_seed2.pt \
+            models/dl_v6_seed3.pt \
+            models/dl_v6_seed4.pt"
           if [ "$MODE" = "live" ]; then
             uv run python -m RL.deploy_rl --live $ENSEMBLE
           else
