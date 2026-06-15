@@ -47,7 +47,7 @@ jobs:
             --hidden 32 \
             --max-weight 0.10 \
             --emb-dim 4 \
-            --ensemble-top-n 15 \
+            --ensemble-top-n 10 \
             --out models/dl_v6_deploy.pt \
             --seeds 0,1,2,3,4
 
