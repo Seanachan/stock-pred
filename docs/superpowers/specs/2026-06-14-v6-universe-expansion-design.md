@@ -113,3 +113,22 @@ walk-forward clears the success bar. v4/v5 ckpts kept for rollback.
   + the drawdown stop remains the backstop).
 - **Retrain timeout at N=90** — ~60–80 min vs 120-min budget; if it creeps,
   drop epochs (500→400) or seeds, or move to a self-hosted runner.
+
+## Result (2026-06-15)
+
+Universe expanded 46 → 88 (43 index-liquid names; 6446 dropped — 2024 IPO collapsed the train window). Two `build_tensors` date-intersection bugs fixed (universe drop + load_data cover-from-start guard). The intersection design does not scale cleanly past ~46 stocks (compounding per-stock data gaps); folds 7–9 (recent) could not be built — validated on **folds 0–6 (7 folds)** only. Proper fix (calendar-reindex + ffill / union+mask in build_tensors) deferred.
+
+5-seed walk-forward, folds 0–6, top-N sweep (offline probe on the cache):
+
+| top_n | mean α | median α | pos | active |
+|---|---|---|---|---|
+| 15 | +3.84% | −0.01% | 3/7 | 15 |
+| 12 | +5.22% | +2.97% | 4/7 | 12 |
+| **10** | **+6.11%** | **+5.65%** | 4/7 | 10 |
+| none | −0.06% | −1.42% | 3/7 | 34 |
+
+**Finding:** the bigger pool helps only with *stronger* concentration — **top_n=10** is best (median +5.65% beats v5's +2.71% / +2.6% on matched folds). Higher N (15–34) drags in marginal names and underperforms. So "more choices" = bigger candidate pool, **fewer** held positions.
+
+**Caveats:** 7-fold (not 10) — recent 2022–2023 folds unvalidated; fold 4 (+52%) still lifts the mean (median is the robust figure); std ~24%. Not airtight vs v5's 10-fold numbers.
+
+**Status:** v6 @ top_n=10 is a genuine improvement on the validatable folds, but ships only after a date-handling fix lets the full 10 folds validate (or via a paper period). Cutover gated on user. v6 deploy ckpts currently carry ensemble_top_n=15 — must be set to 10 before any cutover.
