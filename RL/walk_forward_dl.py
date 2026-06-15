@@ -45,15 +45,13 @@ def load_data(start, end):
         df = pd.read_csv(fp, parse_dates=["date"], index_col="date")
         df = df[~df.index.duplicated(keep="last")].sort_index()
         df = df.loc[start:end].dropna()
-        if len(df) > 30:
+        # Keep only stocks trading from (near) the slice start, so a late-IPO /
+        # partial-coverage stock can't collapse the date intersection in
+        # build_tensors (which crashes windowize or cripples the window). The
+        # absolute-date gate works for both long train and short val slices.
+        if len(df) > 30 and df.index.min() <= pd.Timestamp(start) + pd.Timedelta(days=20):
             dfs[sid] = df
-    if not dfs:
-        return {}
-    # Drop stocks covering < 80% of the longest stock's span in this slice, so a
-    # late-IPO / partial-coverage stock can't collapse the date intersection in
-    # build_tensors (which crashes windowize or cripples the training window).
-    max_len = max(len(df) for df in dfs.values())
-    return {sid: df for sid, df in dfs.items() if len(df) >= 0.8 * max_len}
+    return dfs
 
 
 if __name__ == "__main__":
