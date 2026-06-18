@@ -19,6 +19,7 @@ from __future__ import annotations
 import math
 
 import numpy as np
+import pandas as pd
 import torch
 from torch import nn
 
@@ -41,6 +42,7 @@ def build_tensors(stock_data, feature_extractor, stock_ids, device="cpu"):
         "return", "bias_5", "bias_20", "macd_h", "rsi_14", "bb_pos", "atr",
         "capacity_change", "return_rank", "rsi_14_rank", "bias_20_rank",
         "capacity_change_rank",
+        "vol_20", "mom_60",  # v5: append-only — checkpoint order is load-bearing
     ]
     F = len(feat_cols)
     N = len(stock_ids)
@@ -93,6 +95,108 @@ def sparsemax(z: torch.Tensor, dim: int = -1) -> torch.Tensor:
     cumsum_k = cumsum.gather(dim, k.long() - 1)
     tau = (cumsum_k - 1) / k
     return torch.clamp(z - tau, min=0)
+
+
+def cap_water_fill_np(w: np.ndarray, cap: float, n_iters: int = 16,
+                      top_k: int | None = None) -> np.ndarray:
+    """Redistribute per-stock weight above `cap` to below-cap stocks,
+    proportional to their current weight (conviction-preserving). The cash
+    slot at index -1 is preserved; only residual overflow that cannot fit
+    under the cap falls to cash.
+
+    w: (..., N+1) rows summing to 1 (stocks + cash). Returns same shape with
+    every stock <= cap, rows still summing to 1, output cash >= input cash.
+    Masked / zero-weight stocks receive nothing (share proportional to weight = 0).
+
+    top_k: if set, overflow is redistributed only to the top_k highest-weighted
+    below-cap stocks (by initial weight, fixed across iterations); the rest of
+    the tail receives nothing and overflow the top_k cannot absorb falls to
+    cash. None = all below-cap stocks are eligible (no concentration).
+    """
+    w = np.asarray(w, dtype=np.float64).copy()
+    stock = w[..., :-1]
+    cash = w[..., -1:]
+    stock_mass = stock.sum(axis=-1, keepdims=True)
+    recipients = None
+    if top_k is not None and top_k < stock.shape[-1]:
+        elig = stock < cap
+        masked = np.where(elig, stock, -np.inf)
+        idx = np.argsort(-masked, axis=-1)[..., :top_k]
+        recipients = np.zeros_like(elig)
+        np.put_along_axis(recipients, idx, True, axis=-1)
+        recipients &= elig
+    for _ in range(n_iters):
+        excess = np.maximum(stock - cap, 0.0).sum(axis=-1, keepdims=True)
+        if not np.any(excess > 1e-12):
+            break
+        stock = np.minimum(stock, cap)
+        below = stock < cap
+        if recipients is not None:
+            below = below & recipients
+        pool = (stock * below).sum(axis=-1, keepdims=True)
+        safe_pool = np.where(pool > 0, pool, 1.0)
+        add = np.where(below & (pool > 0), excess * stock / safe_pool, 0.0)
+        stock = stock + add
+    # n_iters=16 converges for up to ~90 stocks, cap=0.10; a
+    # final clamp makes the cap structural rather than iteration-count-dependent.
+    stock = np.minimum(stock, cap)
+    residual = np.maximum(stock_mass - stock.sum(axis=-1, keepdims=True), 0.0)
+    return np.concatenate([stock, cash + residual], axis=-1)
+
+
+def cap_water_fill_torch(w: torch.Tensor, cap: float, n_iters: int = 16,
+                         top_k: int | None = None) -> torch.Tensor:
+    """Differentiable torch twin of cap_water_fill_np (fixed iteration count).
+
+    Same rule; backprops via clamp/min/division (subgradient at the cap edge).
+    `top_k` matches the numpy twin: overflow goes only to the top_k
+    highest-weighted below-cap stocks (fixed recipient set by initial weight).
+    """
+    stock = w[..., :-1]
+    cash = w[..., -1:]
+    stock_mass = stock.sum(dim=-1, keepdim=True)
+    recipients = None
+    if top_k is not None and top_k < stock.shape[-1]:
+        elig = stock < cap
+        masked = torch.where(elig, stock, torch.full_like(stock, float("-inf")))
+        idx = masked.topk(top_k, dim=-1).indices
+        recipients = torch.zeros_like(elig)
+        recipients.scatter_(-1, idx, True)
+        recipients = recipients & elig
+    for _ in range(n_iters):
+        excess = torch.clamp(stock - cap, min=0.0).sum(dim=-1, keepdim=True)
+        stock = torch.clamp(stock, max=cap)
+        below = stock < cap
+        if recipients is not None:
+            below = below & recipients
+        below_f = below.to(stock.dtype)
+        pool = (stock * below_f).sum(dim=-1, keepdim=True)
+        safe_pool = torch.where(pool > 0, pool, torch.ones_like(pool))
+        add = below_f * excess * stock / safe_pool
+        add = torch.where(pool > 0, add, torch.zeros_like(add))
+        stock = stock + add
+    stock = torch.clamp(stock, max=cap)  # structural cap (see np twin)
+    residual = torch.clamp(stock_mass - stock.sum(dim=-1, keepdim=True), min=0.0)
+    return torch.cat([stock, cash + residual], dim=-1)
+
+
+def ensemble_topn_truncate(agg: np.ndarray, top_n: int | None) -> np.ndarray:
+    """Keep the top_n highest-weighted stocks per row (zero the rest), then
+    renormalize so survivors + cash sum to 1. Cash slot (index -1) is never
+    zeroed. Returns same shape. Apply to AGGREGATED ensemble weights BEFORE the
+    cap step. top_n=None (or >= n_stocks) is a no-op.
+    """
+    if top_n is None:
+        return agg
+    agg = np.asarray(agg, dtype=np.float64).copy()
+    n_stocks = agg.shape[-1] - 1
+    if top_n >= n_stocks:
+        return agg
+    stock = agg[..., :-1]
+    kth = np.sort(stock, axis=-1)[..., -top_n][..., None]  # top_n-th largest/row
+    agg[..., :-1] = stock * (stock >= kth)
+    agg /= agg.sum(axis=-1, keepdims=True)
+    return agg
 
 
 class PortfolioNet(nn.Module):
@@ -164,23 +268,35 @@ class PortfolioNetLSTM(nn.Module):
     state at the last timestep of the window is the per-stock embedding.
     """
 
-    def __init__(self, num_stocks: int, feat_per_stock: int = 12,
+    def __init__(self, num_stocks: int, feat_per_stock: int = 14,
                  window_len: int = 50, hidden: int = 64, max_weight: float = 0.10,
-                 use_sparsemax: bool = False):
+                 use_sparsemax: bool = False, emb_dim: int = 4,
+                 cap_overflow: str = "cash", cap_top_k: int | None = None):
         super().__init__()
         self.N = num_stocks
         self.F = feat_per_stock
         self.L = window_len
+        self.emb_dim = emb_dim
         self.max_weight = max_weight
         self.use_sparsemax = use_sparsemax
+        self.cap_overflow = cap_overflow  # "cash" (legacy) | "waterfill"
+        self.cap_top_k = cap_top_k
 
-        self.lstm = nn.LSTM(feat_per_stock, hidden, batch_first=True)
+        # v5: per-stock learnable embedding breaks permutation-equivariance,
+        # so the model can learn "TSMC ≠ 1101". Stock index aligns with
+        # `stock_ids` saved in the checkpoint (deploy guards order).
+        self.stock_emb = nn.Embedding(num_stocks, emb_dim)
+        self.lstm = nn.LSTM(feat_per_stock + emb_dim, hidden, batch_first=True)
         self.head = nn.Linear(hidden, 1)
         self.cash_logit = nn.Parameter(torch.zeros(1))
 
     def forward(self, feats: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
         T, N, L, F = feats.shape
-        x = feats.reshape(T * N, L, F)
+        # v5: append per-stock embedding to every timestep of every window.
+        ids = torch.arange(N, device=feats.device)
+        emb = self.stock_emb(ids).view(1, N, 1, self.emb_dim).expand(T, N, L, self.emb_dim)
+        feats_aug = torch.cat([feats, emb], dim=-1)  # (T, N, L, F + emb_dim)
+        x = feats_aug.reshape(T * N, L, F + self.emb_dim)
         out, _ = self.lstm(x)
         last = out[:, -1, :]
         scores = self.head(last).squeeze(-1).reshape(T, N)
@@ -194,6 +310,8 @@ class PortfolioNetLSTM(nn.Module):
         return weights
 
     def _cap_renorm(self, w: torch.Tensor) -> torch.Tensor:
+        if self.cap_overflow == "waterfill":
+            return cap_water_fill_torch(w, self.max_weight, top_k=self.cap_top_k)
         N = self.N
         stock = w[:, :N]
         cash = w[:, N:]
@@ -385,6 +503,8 @@ def train_one_fold_lstm(
     use_sparsemax: bool = False,
     entropy_lambda: float = 0.0,
     train_recent_days: int = 500,
+    cap_overflow: str = "cash",
+    cap_top_k: int | None = None,
     device: str = "cpu",
     log_every: int = 50,
     seed: int = 0,
@@ -410,6 +530,8 @@ def train_one_fold_lstm(
         hidden=hidden,
         max_weight=max_weight,
         use_sparsemax=use_sparsemax,
+        cap_overflow=cap_overflow,
+        cap_top_k=cap_top_k,
     ).to(device)
     opt = torch.optim.Adam(net.parameters(), lr=lr, weight_decay=weight_decay)
 

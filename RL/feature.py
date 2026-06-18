@@ -10,7 +10,7 @@ from pandas_ta.volatility import atr, bbands
 class FeatureExtractor:
     def __init__(self, stock_ids: List[str]):
         self.stock_ids = stock_ids
-        self.feature_dim_per_stock = 12
+        self.feature_dim_per_stock = 14
 
     def extract_features(
         self, stock_data: Dict[str, DataFrame]
@@ -67,6 +67,13 @@ class FeatureExtractor:
 
             # Capacity Change
             df_copy["capacity_change"] = df_copy["capacity"].pct_change()
+
+            # 20d realized vol (log-return stdev) — feeds T3 cash head too
+            log_r = np.log1p(df_copy["return"].fillna(0.0))
+            df_copy["vol_20"] = log_r.rolling(20).std()
+
+            # 60d momentum (simple % return)
+            df_copy["mom_60"] = (df_copy["close"] / df_copy["close"].shift(60)) - 1.0
 
             market_dfs[stock_id] = df_copy
 

@@ -1,6 +1,6 @@
-generated_at: '2026-05-01T16:47:04'
+generated_at: '2026-06-15T04:06:45'
 requested_start: '20150101'
-requested_end: '20260422'
+requested_end: '20260614'
 source: stock_api (TWSE official)
 split_suggestion:
   train: 2015-01 .. 2022-12
@@ -20,302 +20,542 @@ schema:
 stocks:
   '2330':
     name: 台積電
-    rows: 2707
+    rows: 2735
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2317':
     name: 鴻海
-    rows: 2697
+    rows: 2706
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2454':
     name: 聯發科
-    rows: 2732
+    rows: 2760
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2308':
     name: 台達電
-    rows: 2749
+    rows: 2740
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2382':
     name: 廣達
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2303':
     name: 聯電
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '3711':
     name: 日月光投控
-    rows: 1886
+    rows: 1978
     first_date: '2018-04-30'
-    last_date: '2026-04-22'
+    last_date: '2026-06-12'
     status: fetched
   '6669':
     name: 緯穎
-    rows: 1719
+    rows: 1734
     first_date: '2019-03-27'
-    last_date: '2026-04-22'
+    last_date: '2026-06-12'
     status: fetched
   '5347':
     name: 世界
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '8046':
     name: 南電
-    rows: 2685
+    rows: 2713
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2474':
     name: 可成
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2354':
     name: 鴻準
-    rows: 2737
+    rows: 2743
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2376':
     name: 技嘉
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '3034':
     name: 聯詠
-    rows: 2733
+    rows: 2761
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '3008':
     name: 大立光
-    rows: 2754
+    rows: 2759
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '3045':
     name: 台灣大
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '4904':
     name: 遠傳
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2412':
     name: 中華電
-    rows: 2685
+    rows: 2713
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '8454':
     name: 富邦媒
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2881':
     name: 富邦金
-    rows: 2729
+    rows: 2757
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2882':
     name: 國泰金
-    rows: 2645
+    rows: 2673
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2891':
     name: 中信金
-    rows: 2694
+    rows: 2722
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2884':
     name: 玉山金
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2885':
     name: 元大金
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2886':
     name: 兆豐金
-    rows: 2710
+    rows: 2738
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2887':
     name: 台新金
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '2890':
     name: 永豐金
-    rows: 2709
+    rows: 2737
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2880':
     name: 華南金
-    rows: 2588
+    rows: 2616
     first_date: '2015-02-02'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '2892':
     name: 第一金
-    rows: 2709
+    rows: 2737
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '1101':
     name: 台泥
-    rows: 2703
+    rows: 2745
     first_date: '2015-01-05'
-    last_date: '2026-03-31'
+    last_date: '2026-06-02'
     status: cached
   '1102':
     name: 亞泥
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '1216':
     name: 統一
-    rows: 2669
+    rows: 2677
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '1301':
     name: 台塑
-    rows: 2684
+    rows: 2691
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '1303':
     name: 南亞
-    rows: 2709
+    rows: 2737
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
+    last_date: '2026-06-02'
     status: cached
   '1326':
     name: 台化
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '2002':
     name: 中鋼
-    rows: 2729
+    rows: 2757
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '2207':
     name: 和泰車
-    rows: 2729
+    rows: 2757
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '6505':
     name: 台塑化
-    rows: 2689
+    rows: 2717
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '9910':
     name: 豐泰
-    rows: 2738
+    rows: 2766
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '2603':
     name: 長榮
-    rows: 2724
+    rows: 2752
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '2609':
     name: 陽明
-    rows: 2742
+    rows: 2770
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '2615':
     name: 萬海
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '2618':
     name: 長榮航
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '2912':
     name: 統一超
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '5880':
     name: 合庫金
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '6415':
     name: 矽力
-    rows: 2727
+    rows: 2755
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '6446':
     name: 藥華藥
-    rows: 537
+    rows: 573
     first_date: '2024-01-25'
-    last_date: '2026-04-22'
+    last_date: '2026-06-12'
     status: fetched
   '9921':
     name: 巨大
-    rows: 2751
+    rows: 2779
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '3231':
     name: 緯創
-    rows: 2730
+    rows: 2758
     first_date: '2015-01-05'
-    last_date: '2026-04-22'
-    status: fetched
+    last_date: '2026-06-02'
+    status: cached
   '6770':
     name: 力積電
-    rows: 1036
+    rows: 1094
     first_date: '2021-12-06'
-    last_date: '2026-04-22'
+    last_date: '2026-06-12'
+    status: fetched
+  '2383':
+    name: 台光電
+    rows: 2766
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2327':
+    name: 國巨
+    rows: 2756
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '3037':
+    name: 欣興
+    rows: 2748
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2345':
+    name: 智邦
+    rows: 2787
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2360':
+    name: 致茂
+    rows: 2771
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '3017':
+    name: 奇鋐
+    rows: 2765
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2357':
+    name: 華碩
+    rows: 2765
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '3653':
+    name: 健策
+    rows: 2777
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2883':
+    name: 凱基金
+    rows: 2764
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2368':
+    name: 金像電
+    rows: 2760
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2449':
+    name: 京元電子
+    rows: 2766
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2344':
+    name: 華邦電
+    rows: 2787
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2301':
+    name: 光寶科
+    rows: 2787
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2408':
+    name: 南亞科
+    rows: 2767
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '3661':
+    name: 世芯-KY
+    rows: 2767
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2059':
+    name: 川湖
+    rows: 2767
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2395':
+    name: 研華
+    rows: 2768
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2379':
+    name: 瑞昱
+    rows: 2787
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '3443':
+    name: 創意
+    rows: 2772
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '5871':
+    name: 中租-KY
+    rows: 2766
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '4938':
+    name: 和碩
+    rows: 2787
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2324':
+    name: 仁寶
+    rows: 2766
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2356':
+    name: 英業達
+    rows: 2787
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2347':
+    name: 聯強
+    rows: 2787
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '1590':
+    name: 亞德客-KY
+    rows: 2787
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '5876':
+    name: 上海商銀
+    rows: 1858
+    first_date: '2018-10-19'
+    last_date: '2026-06-12'
+    status: fetched
+  '3036':
+    name: 文曄
+    rows: 2787
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2409':
+    name: 友達
+    rows: 2780
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '1402':
+    name: 遠東新
+    rows: 2787
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2353':
+    name: 宏碁
+    rows: 2787
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '9904':
+    name: 寶成
+    rows: 2746
+    first_date: '2015-02-02'
+    last_date: '2026-06-12'
+    status: fetched
+  '2049':
+    name: 上銀
+    rows: 2764
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '1476':
+    name: 儒鴻
+    rows: 2787
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2105':
+    name: 正新
+    rows: 2764
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2377':
+    name: 微星
+    rows: 2744
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '6285':
+    name: 啟碁
+    rows: 2787
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '5269':
+    name: 祥碩
+    rows: 2764
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2633':
+    name: 台灣高鐵
+    rows: 2346
+    first_date: '2016-10-27'
+    last_date: '2026-06-12'
+    status: fetched
+  '2610':
+    name: 華航
+    rows: 2767
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
+    status: fetched
+  '2801':
+    name: 彰銀
+    rows: 2787
+    first_date: '2015-01-05'
+    last_date: '2026-06-12'
     status: fetched
 failures: []

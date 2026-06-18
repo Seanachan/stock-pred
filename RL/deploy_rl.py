@@ -36,7 +36,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
 import RL.env  # noqa: F401  registers TradingEnv-v0
 from RL.constant import stock_ids
-from RL.dl_portfolio import PortfolioNetLSTM
+from RL.dl_portfolio import PortfolioNetLSTM, cap_water_fill_np, ensemble_topn_truncate
 from RL.feature import FeatureExtractor
 from stock_api import Buy_Stock, Get_User_Stocks, Sell_Stock, get_taiwan_stock_data
 
@@ -585,42 +585,62 @@ def reconcile_inventory(state: dict, account: str, password: str) -> int:
 def predict_dl_ensemble_weights(
     checkpoint_paths: list[str], stock_data: dict, obs_date
 ) -> np.ndarray:
-    """Median ensemble of v4 LSTM checkpoints.
+    """Sharpe-weighted-mean ensemble of v5 LSTM checkpoints.
 
-    Each seed produces a (N+1,) post-softmax + post-cap weight vector. We take
-    the per-dim median across seeds (consistent with PPO ensemble in
-    predict_ensemble_logits), then renormalize to sum=1 and re-enforce the
-    per-stock cap (median can introduce small cap violations or sum drift).
+    v5: per-dim median (v4) wiped conviction trades (any seed at zero on
+    stock X pulled median down). Replace with softmax(val_sharpe)-weighted
+    mean. Each ckpt carries `val_sharpe` from its 60d holdout (set by
+    dl_train_deploy.py). Missing field → 0.0 → degenerates to uniform mean.
+
+    MIRRORS `RL.walk_forward_dl_ensemble.aggregate_weights` exactly so
+    backtest = live. Any change here must be replicated there.
     """
     per_seed = []
+    per_seed_scores = []
+    cap = None
+    cap_overflow = "cash"
+    cap_top_k = None
+    ensemble_top_n = None
     for p in checkpoint_paths:
         w = predict_dl_weights(p, stock_data, obs_date)
         per_seed.append(w.astype(np.float64))
-    stacked = np.stack(per_seed)  # shape (n_seeds, N+1)
-    median = np.median(stacked, axis=0)
+        ckpt = torch.load(p, map_location="cpu", weights_only=False)
+        per_seed_scores.append(float(ckpt.get("val_sharpe", 0.0)))
+        if cap is None:
+            cap = float(ckpt["config"].get("max_weight", 0.10))
+            cap_overflow = ckpt["config"].get("cap_overflow", "cash")
+            cap_top_k = ckpt["config"].get("cap_top_k")
+            ensemble_top_n = ckpt["config"].get("ensemble_top_n")
+    stacked = np.stack(per_seed)  # (n_seeds, N+1)
 
-    # Median doesn't preserve sum=1 — renormalize.
-    median = np.clip(median, 0.0, None)
-    s = median.sum()
+    scores = np.asarray(per_seed_scores, dtype=np.float64)
+    w_s = np.exp(scores - scores.max())
+    w_s /= w_s.sum()
+    agg = (stacked * w_s[:, None]).sum(axis=0)
+
+    agg = np.clip(agg, 0.0, None)
+    s = agg.sum()
     if s <= 0:
-        # Degenerate: fall back to all-cash.
-        out = np.zeros_like(median)
+        out = np.zeros_like(agg)
         out[-1] = 1.0
         return out
-    median /= s
+    agg /= s
 
-    # Re-enforce per-stock cap (10%), excess overflow to cash slot.
     N = len(stock_ids)
-    cap = 0.10
-    excess = float(np.sum(np.maximum(median[:N] - cap, 0.0)))
-    median[:N] = np.minimum(median[:N], cap)
-    median[N] += excess
+    agg = ensemble_topn_truncate(agg, ensemble_top_n)
+    if cap_overflow == "waterfill":
+        agg = cap_water_fill_np(agg, cap, top_k=cap_top_k)
+    else:
+        excess = float(np.sum(np.maximum(agg[:N] - cap, 0.0)))
+        agg[:N] = np.minimum(agg[:N], cap)
+        agg[N] += excess
     print(
-        f"  v4 ensemble (n={len(per_seed)}): "
-        f"max stock={median[:N].max():.4f}, cash={median[N]:.4f}, "
-        f"active={int((median[:N] > 0.005).sum())}"
+        f"  v5 ensemble (n={len(per_seed)}): "
+        f"max stock={agg[:N].max():.4f}, cash={agg[N]:.4f}, "
+        f"active={int((agg[:N] > 0.005).sum())}  "
+        f"seed_weights={[f'{x:.2f}' for x in w_s.tolist()]}"
     )
-    return median
+    return agg
 
 
 def predict_dl_weights(checkpoint_path: str, stock_data: dict, obs_date) -> np.ndarray:
@@ -666,6 +686,9 @@ def predict_dl_weights(checkpoint_path: str, stock_data: dict, obs_date) -> np.n
         hidden=cfg["hidden"],
         max_weight=cfg["max_weight"],
         use_sparsemax=cfg.get("use_sparsemax", False),
+        emb_dim=cfg.get("emb_dim", 4),  # v5 default; v4 ckpts won't load anyway
+        cap_overflow=cfg.get("cap_overflow", "cash"),
+        cap_top_k=cfg.get("cap_top_k"),
     )
     net.load_state_dict(ckpt["state_dict"])
     net.eval()
@@ -673,7 +696,7 @@ def predict_dl_weights(checkpoint_path: str, stock_data: dict, obs_date) -> np.n
     with torch.no_grad():
         weights = net(torch.from_numpy(feats), torch.from_numpy(mask)).numpy()[0]
     print(
-        f"  v4 weights: max stock={weights[:N].max():.4f}, "
+        f"  v5 weights: max stock={weights[:N].max():.4f}, "
         f"cash={weights[N]:.4f}, active={int((weights[:N] > 0.005).sum())}"
     )
     return weights
@@ -710,6 +733,12 @@ if __name__ == "__main__":
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--status", action="store_true")
     parser.add_argument(
+        "--state",
+        default="deploy_state.json",
+        help="ledger state-file path; use a separate file for paper runs so "
+        "the live ledger is not clobbered",
+    )
+    parser.add_argument(
         "--refresh-data",
         action="store_true",
         help="force-refresh all CSVs from TWSE before predicting",
@@ -725,6 +754,8 @@ if __name__ == "__main__":
         help="only run broker reconcile, then exit",
     )
     args = parser.parse_args()
+
+    STATE_FILE = Path(args.state)  # rebinds module global; load/save_state use it
 
     state = load_state()
 
