@@ -1,0 +1,204 @@
+% !TEX program = xelatex
+% 編譯：xelatex final_report.tex（需 ctex / xeCJK 環境，建議 TeX Live 2022+）
+\documentclass[11pt]{ctexart}
+
+\usepackage{geometry}
+\geometry{a4paper, margin=2.5cm}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue!55!black, urlcolor=blue!55!black,
+            citecolor=blue!55!black}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  frame=single,
+  framesep=4pt,
+  rulecolor=\color{black!25},
+  backgroundcolor=\color{black!3},
+  columns=fullflexible,
+}
+
+\title{\textbf{深度學習投資組合自動交易機器人\\—— 台股 88 檔宇宙之 LSTM 集成策略設計與實證}}
+\author{自動交易專題 期末成果報告}
+\date{2026 年 6 月}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+本專題設計一套\textbf{每日自動再平衡}的台股投資組合交易機器人。核心為一個\emph{跨個股共享、置換等變}的 LSTM 評分網路（\texttt{PortfolioNetLSTM}），以 50 日視窗、每檔 14 維特徵（8 維技術指標 + 4 維橫斷面排名 + 波動／動能）對每檔股票輸出分數，經 softmax 與\textbf{每檔上限（per-stock cap）}得到目標權重，並以\textbf{負 Sharpe（含換手成本）}端到端訓練。模型歷經三代演進：v4（中位數集成）$\rightarrow$ v5（Sharpe 加權集成 + 注水式溢出重分配 water-fill + 集成 Top-$N$ 截斷）$\rightarrow$ v6（股票宇宙由 46 檔擴充至 88 檔、Top-$N=10$ 強化集中度、每日重訓）。在 2019–2023 共 10 折\emph{滾動式前向驗證（walk-forward）}下，v5 相對等權基準之 OOS 超額報酬中位數為 \textbf{+2.71\%}（平均 +6.96\%），勝過 v4 的 +0.98\%；v6 在可驗證的 7 折上中位超額報酬達 \textbf{+5.65\%}。關鍵發現為：\emph{更大的候選池需搭配更強的集中度}（Top-10 而非 Top-15）方能濾除雜訊。系統已於 GitHub Actions 上以每日 17:00（台北）排程實盤（模擬）部署，並內建回撤停損與最小交易次數（$\geq 100$ 筆）之湊單機制。
+\end{abstract}
+
+\section{專題目標與條件}
+
+\subsection{給定條件}
+\begin{itemize}[leftmargin=2em]
+  \item 初始資本：100{,}000{,}000 元（虛擬資金）。
+  \item 資料來源：近十年每日台股歷史交易資訊（漲跌幅、開、收、高、低、成交量）。
+  \item 交易介面：股票買賣交易 API（NCKU \texttt{sim\_stock}）。
+\end{itemize}
+
+\subsection{目標}
+設計可\textbf{每日執行}的自動化交易機器人，於可交易期間（即日起至 2026/06/26）內最大化投資利潤，且系統須\textbf{成功自動完成至少 100 筆交易}。投資利潤定義為
+\[
+\text{利潤} \;=\; \big[\text{2026/06/26 收盤後資產總額}\big] \;-\; 100{,}000{,}000.
+\]
+
+\section{系統架構}
+
+整體管線由三個彼此獨立、僅共用交易 API 的子系統構成（圖~\ref{fig:pipeline}）：
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{資料層}（\texttt{stock\_api/}）：直接抓取 TWSE／TPEX 官方端點之價量歷史，統一為 10 欄位 schema，內建指數退避、ROC 日期轉換與千分位／除權息標記清理；每月請求間隔 2 秒以避免上游限流。
+  \item \textbf{模型／部署層}（\texttt{RL/}）：特徵工程、LSTM 評分網路、集成決策與實盤下單。
+  \item \textbf{CI 自動化}：兩條 GitHub Actions——每日部署（工作日 17:00 台北）與每日重訓——將狀態與權重提交回 \texttt{main}。
+\end{enumerate}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  node distance=8mm and 12mm,
+  box/.style={draw, rounded corners, align=center, minimum height=8mm,
+              minimum width=22mm, font=\small, fill=black!4},
+  >=Stealth]
+  \node[box] (twse) {TWSE / TPEX\\ 官方價量};
+  \node[box, right=of twse] (csv) {本地快取\\ \texttt{RL/data/*.csv}};
+  \node[box, right=of csv] (feat) {特徵工程\\ 14 維 / 檔};
+  \node[box, right=of feat] (lstm) {LSTM 評分\\ + 集成};
+  \node[box, below=of lstm] (order) {權重 $\to$ 整股\\ 下單（含費稅）};
+  \node[box, left=of order] (broker) {交易 API\\ 對帳 / 成交};
+  \node[box, left=of broker] (state) {帳本狀態\\ \texttt{deploy\_state.json}};
+  \draw[->] (twse)--(csv); \draw[->] (csv)--(feat); \draw[->] (feat)--(lstm);
+  \draw[->] (lstm)--(order); \draw[->] (order)--(broker); \draw[->] (broker)--(state);
+  \draw[->] (state.north) |- ([yshift=4mm]feat.north) -| (feat.north);
+\end{tikzpicture}
+\caption{每日交易管線：抓取／快取 $\to$ 特徵 $\to$ LSTM 集成評分 $\to$ 整股下單 $\to$ 對帳 $\to$ 帳本持久化。}
+\label{fig:pipeline}
+\end{figure}
+
+\subsection{特徵工程}
+每檔股票每日構造 14 維特徵：8 維\emph{個股本地技術指標}（\texttt{return}、\texttt{bias\_5}、\texttt{bias\_20}、\texttt{macd\_h}、\texttt{rsi\_14}、\texttt{bb\_pos}、\texttt{atr}、\texttt{capacity\_change}）、4 維\emph{橫斷面每日排名}（report、rsi、bias\_20、量能變化之 pct-rank），以及 v6 新增之 \texttt{vol\_20}（20 日對數報酬標準差）與 \texttt{mom\_60}（60 日動能）。橫斷面排名提供「市場相對」訊號，是模型超額報酬的關鍵來源。
+
+\subsection{股票宇宙}
+v4／v5 使用 46 檔台股大型權值股；v6 依台灣 50（0050）與中型 100（0051／0100）成分股，篩除興櫃（ESB，無真實開盤價）後擴充至 \textbf{88 檔}（原 46 + 43 檔流動性佳之上市／上櫃中大型股；另剔除 2024 才上市、歷史過短的 6446）。個股順序為\emph{承載性的（load-bearing）}：檢查點儲存訓練時的順序，部署端比對不符即拒絕執行，故擴充宇宙必須完整重訓。
+
+\section{模型設計}
+
+\subsection{PortfolioNetLSTM}
+網路對每檔股票之 50 日特徵窗（含 4 維可學習個股嵌入 \texttt{nn.Embedding}）跑\emph{共享權重}的單層 LSTM，取末步隱狀態經線性層輸出一個分數；$N$ 檔分數與一個可學習現金分數串接後 softmax，得到含現金槽的權重向量。其後施以每檔上限 \texttt{max\_weight}$=0.10$。模型主要參數量與 $N$ 幾乎無關（LSTM 共享），僅嵌入表 $N\times 4$ 隨宇宙線性微增，故由 46 擴至 88 在計算上乾淨可行。
+
+\subsection{損失函數}
+端到端最小化\textbf{負 Sharpe}。實現報酬序列時計入 L1 換手成本：
+\[
+\text{pnl}_t \;=\; \langle w_t,\, r_t\rangle \;-\; c\cdot \big\| w_t - \tilde{w}_{t-1}\big\|_1,
+\]
+其中 $\tilde{w}_{t-1}$ 為前期權重經當期資產漂移後之值，$c=0.0042$。如此模型在訓練時即「感知」交易成本，傾向降低不必要換手。
+
+\subsection{三代演進與兩個關鍵槓桿}
+\begin{description}[leftmargin=1.5em, style=nextline]
+  \item[v4（基線）] 5 seed 以\emph{逐維中位數}集成。問題：中位數會抹除任一 seed 為零的高信念部位——單 seed walk-forward 超額 +4.09\%，中位集成卻塌陷為 +0.98\%。
+  \item[v5—槓桿 A：注水式溢出（water-fill）] 原本「超過上限的權重一律倒入現金」造成在多頭時結構性落後等權基準（約 48\% 資金閒置於現金）。改為將溢出\emph{按現價權重重分配給未達上限之個股}（保留模型深思熟慮的現金，僅消除機械式溢出），現金佔比由 $\sim$48\% 降至 $\sim$3\%。
+  \item[v5—槓桿 B：Sharpe 加權集成 + 集成 Top-$N$ 截斷] 以 $\mathrm{softmax}(\text{val Sharpe})$ 對 seed 加權平均取代中位數；再於\emph{集成後}硬性保留權重最大的 $N$ 檔、其餘歸零後重新標準化。三處上限邏輯（訓練前傳、walk-forward 集成、部署集成）以單一共享函數鎖定一致，並以對拍測試保證 backtest = live。
+  \item[v6—宇宙擴充] 88 檔 + Top-$N$ 重調 + 每日重訓。
+\end{description}
+
+\section{交易策略與部署}
+
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{每日再平衡}：以 5 seed 集成輸出之目標權重，與券商對帳後之實際庫存比較，差額轉為\textbf{整股（1000 股／張）}買賣單；買單以 $\min(\text{開},\text{收})$、賣單以 $\max(\text{開},\text{收})$ 報價以提高成交率，價格依台股 tick 規則四捨五入，計入 0.1425\% 手續費與 0.3\% 證交稅（賣方），最低 20 元。
+  \item \textbf{回撤停損}：以峰值資產為基準，若 $(\text{peak}-\text{port})/\text{peak} > 10\%$ 即全數平倉並\emph{黏滯停機（sticky halt）}，需人工解除——此為實盤的最終風險防線。
+  \item \textbf{對帳優先}：\texttt{--live} 每次先呼叫 \texttt{Get\_User\_Stocks} 以券商真實庫存覆寫本地庫存，再行決策（「先知道手上有多少股與現金，再下單」），可校正被拒單造成的漂移。
+  \item \textbf{最小交易次數（湊單）}：為滿足「$\geq 100$ 筆交易」之系統要求，於模型再平衡後追加 \texttt{--pad-pairs}$=12$ 之\emph{賣出—買回}往返單（每對 2 筆、對組合淨中性，僅付單邊約 0.585\% 費稅於一張最便宜持股），每個交易日穩定新增 24 筆，數個交易日內即可達標。
+\end{itemize}
+
+\section{實驗流程}
+
+\subsection{滾動式前向驗證（Walk-forward）}
+採 2019 H1 至 2023 H2 共 \textbf{10 個 6 個月折}，每折以擴張訓練集（自 2015 起）之最近 500 個交易日訓練 5 seed，再於該折驗證窗計算超額報酬、Sharpe、現金佔比與活躍檔數。集成決策規則與實盤完全相同（同一 \texttt{aggregate\_weights}），故 OOS 數字與部署決策「同口徑」。
+
+\subsection{Top-$N$ 離線掃描（探針）}
+由於 Top-$N$ 截斷為\emph{集成後}之後處理、不改變訓練，故可將一次 walk-forward 快取之各 seed 每日權重\textbf{離線重放}於不同 $N$（\texttt{probe\_ensemble\_topn.py}），於數秒內掃出最佳 $N$，無須重訓。此設計使「更多選擇」這個假設能以近乎零成本驗證。
+
+\section{結果分析}
+
+\subsection{各代 OOS 超額報酬（vs.\ 等權基準）}
+表~\ref{tab:gen} 比較三代模型之 walk-forward 表現。v5 的注水 + Top-15 顯著優於 v4；v6 擴充宇宙後，\emph{在 Top-15 反而退步}，須\textbf{加強集中度至 Top-10} 方勝出。
+
+\begin{table}[h]
+\centering
+\caption{各代模型之 walk-forward OOS 超額報酬（相對等權基準）。}
+\label{tab:gen}
+\small
+\begin{tabular}{lccccc}
+\toprule
+模型 & 宇宙 & 集成／Top-$N$ & 平均超額 & 中位超額 & 正報酬折數 \\
+\midrule
+v4            & 46 & 中位數         & +0.98\% & ---     & 5/10 \\
+v4（單 seed） & 46 & ---            & +4.09\% & ---     & 5/10 \\
+v5            & 46 & 注水 + Top-15  & \textbf{+6.96\%} & +2.71\% & 7/10 \\
+v6（7 折）    & 88 & 注水 + Top-15  & +3.84\% & $-0.01\%$ & 3/7 \\
+v6（7 折）    & 88 & 注水 + \textbf{Top-10} & +6.11\% & \textbf{+5.65\%} & 4/7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{核心發現：更大的池、更少的部位}
+表~\ref{tab:topn} 為 v6 快取上之 Top-$N$ 掃描。當候選池由 46 擴至 88，雜訊增加，\emph{放寬}選股（$N\geq15$，活躍 15--34 檔）反而拖入邊際個股而表現平庸；\emph{收緊}至 Top-10 取最高信念之 10 檔，中位超額由 $-0.01\%$ 躍升至 \textbf{+5.65\%}。但過度集中（$N\leq8$）又使現金外溢、中位塌陷。最佳點落在 $N\approx10$。
+
+\begin{table}[h]
+\centering
+\caption{v6（88 檔）集成 Top-$N$ 離線掃描（7 折）。}
+\label{tab:topn}
+\small
+\begin{tabular}{cccccc}
+\toprule
+Top-$N$ & 平均超額 & 中位超額 & 正報酬折數 & 平均現金 & 平均活躍檔數 \\
+\midrule
+none(34) & $-0.06\%$ & $-1.42\%$ & 3/7 & 3.4\% & 34.2 \\
+20       & +2.52\%   & $-1.72\%$ & 3/7 & 4.2\% & 20.0 \\
+15       & +3.84\%   & $-0.01\%$ & 3/7 & 4.8\% & 15.0 \\
+12       & +5.22\%   & +2.97\%   & 4/7 & 5.4\% & 12.0 \\
+\textbf{10} & \textbf{+6.11\%} & \textbf{+5.65\%} & 4/7 & 5.9\% & 10.0 \\
+8        & +5.14\%   & +3.46\%   & 4/7 & 21.9\% & 8.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{現金外溢槓桿之實證}
+v5 的注水改造將 fold-0（強多頭）之現金由 54.7\% 降至 10.5\%、整體超額由 v4 等級提升至 +4.27\%（平均，10 折），驗證「現金外溢」確為當時的主要拖累。但其平均值高度受單一 fold-4（+53.7\%）驅動，故全程以\emph{中位數}為穩健衡量。
+
+\subsection{實盤部署}
+v6 已於 2026/06/18 完成上線（\texttt{main}），首個交易日依 Top-10 規則建立 10 檔持股、現金近乎全數投入、回撤 0\%（峰值重設，不繼承前代回撤）。每日由 CI 自動再平衡並追加湊單，最終損益以 2026/06/26 收盤結算。
+
+\section{討論與限制}
+\begin{itemize}[leftmargin=2em]
+  \item \textbf{資料對齊的擴展性瓶頸}：\texttt{build\_tensors} 以各股日期\emph{交集}對齊，在 88 檔下各股零星缺值\emph{複合}累積，使近期 3 折（2022--2023）共同日數塌陷至無法成窗，故 v6 僅在 0--6 折（7 折）完成驗證。根因之正解為改採\emph{聯集 + 前向填補 + 遮罩}，可解鎖全 10 折驗證並支援宇宙進一步成長——列為首要後續工作。（注：部署端推論為逐股、含遮罩，故不受此影響。）
+  \item \textbf{高變異與 fold 依賴}：超額報酬標準差約 24\%，平均值常受單一強勢 fold 拉抬；中位數方為可信指標，且 v6 僅 7 折驗證，需以上線初期實盤行為交叉佐證。
+  \item \textbf{帳戶起點}：v6 繼承前代 v4 觸發停損後之資本（約 74.8M，相對 100M 名目已 $-25\%$）；本報告之模型優勢以\emph{OOS 超額報酬}論證，最終競賽損益則受此起點與短窗影響。
+\end{itemize}
+
+\section{結論}
+本專題以一個輕量、置換等變、成本感知的 LSTM 投資組合網路為核心，透過\emph{注水式溢出重分配}消除結構性現金拖累、\emph{Sharpe 加權集成 + Top-$N$ 截斷}保留高信念部位，並以\emph{擴充候選池 + 強化集中度}進一步提升選股品質。嚴謹的滾動前向驗證顯示 v6（88 檔、Top-10）之 OOS 中位超額達 +5.65\%，明顯優於基線。系統已自動化實盤部署，內建風險停損與最小交易次數機制，完整滿足專題之系統要求。
+
+\appendix
+\section{程式架構（節錄）}
+\begin{itemize}[leftmargin=2em]
+  \item \texttt{stock\_api/}：TWSE／TPEX 抓取、symbol 對映、交易 API 封裝。
+  \item \texttt{RL/feature.py}：14 維特徵與橫斷面排名。
+  \item \texttt{RL/dl\_portfolio.py}：\texttt{PortfolioNetLSTM}、\texttt{cap\_water\_fill}、\texttt{ensemble\_topn\_truncate}、Sharpe 損失、\texttt{train\_one\_fold\_lstm}。
+  \item \texttt{RL/dl\_train\_deploy.py}：5 seed 重訓並輸出自帶設定之檢查點。
+  \item \texttt{RL/walk\_forward\_dl\_ensemble.py} / \texttt{probe\_ensemble\_topn.py}：10 折前向驗證與 Top-$N$ 離線掃描。
+  \item \texttt{RL/deploy\_rl.py}：對帳、整股下單、回撤停損、湊單（\texttt{run\_pad\_pairs}）、帳本持久化。
+  \item \texttt{.github/workflows/}：每日部署與每日重訓之 CI。
+\end{itemize}
+
+\end{document}
