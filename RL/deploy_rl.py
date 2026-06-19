@@ -458,44 +458,62 @@ def run_pad_pairs(state, stock_data, account, password, n_pairs, live):
     if not cands:
         print("  pad: no held lots to round-trip; skipping")
         return log
-    for i in range(n_pairs):
-        sid, _ = cands[i % len(cands)]
+    picks = [cands[i % len(cands)][0] for i in range(n_pairs)]
+
+    # Phase 1 — SELL one lot of each pick FIRST, building a cash pool so the
+    # buybacks are funded even when the model left the book fully invested.
+    sold = []
+    for sid in picks:
+        if state["inventory"].get(sid, 0) < 1000:
+            continue
         ps = submit_price(sid, stock_data, "SELL")
-        if ps > 0:
-            gross = 1000 * ps
-            cost = gross * (TAX + FEE)
-            if live and account:
-                try:
-                    ok = bool(Sell_Stock(account, password, sid, 1, ps))
-                    resp = "OK" if ok else "REJECTED"
-                except Exception as e:
-                    ok, resp = False, f"ERR:{e}"
-            else:
-                ok, resp = True, "PAPER"
-            log.append({"sid": sid, "action": "SELL", "lots": 1, "shares": 1000,
-                        "price": ps, "weight": 0.0, "resp": resp, "ok": ok, "pad": True})
-            if ok:
-                state["cash_balance"] += gross - cost
-                state["inventory"][sid] -= 1000
+        if ps <= 0:
+            continue
+        gross = 1000 * ps
+        cost = gross * (TAX + FEE)
+        if live and account:
+            try:
+                ok = bool(Sell_Stock(account, password, sid, 1, ps))
+                resp = "OK" if ok else "REJECTED"
+            except Exception as e:
+                ok, resp = False, f"ERR:{e}"
+        else:
+            ok, resp = True, "PAPER"
+        log.append({"sid": sid, "action": "SELL", "lots": 1, "shares": 1000,
+                    "price": ps, "weight": 0.0, "resp": resp, "ok": ok, "pad": True})
+        if ok:
+            state["cash_balance"] += gross - cost
+            state["inventory"][sid] -= 1000
+            sold.append(sid)
+
+    # Phase 2 — BUY each lot back, but ONLY if there is cash for it (guard).
+    # An unaffordable buyback is skipped, never submitted, so the pad can never
+    # overdraw cash; a skipped lot is simply restored by the next rebalance.
+    for sid in sold:
         pb = submit_price(sid, stock_data, "BUY")
-        if pb > 0:
-            gross = 1000 * pb
-            fee = max(gross * FEE, MIN_FEE)
-            if live and account:
-                try:
-                    ok = bool(Buy_Stock(account, password, sid, 1, pb))
-                    resp = "OK" if ok else "REJECTED"
-                except Exception as e:
-                    ok, resp = False, f"ERR:{e}"
-            else:
-                ok, resp = True, "PAPER"
-            log.append({"sid": sid, "action": "BUY", "lots": 1, "shares": 1000,
-                        "price": pb, "weight": 0.0, "resp": resp, "ok": ok, "pad": True})
-            if ok:
-                state["cash_balance"] -= gross + fee
-                state["inventory"][sid] = state["inventory"].get(sid, 0) + 1000
-    print(f"  pad: {len(log)} round-trip orders ({sum(1 for e in log if e['ok'])} ok)"
-          f" over {n_pairs} pairs")
+        if pb <= 0:
+            continue
+        gross = 1000 * pb
+        fee = max(gross * FEE, MIN_FEE)
+        if state["cash_balance"] < gross + fee:
+            print(f"  pad: skip buyback {sid} (cash {state['cash_balance']:,.0f} "
+                  f"< {gross + fee:,.0f})")
+            continue
+        if live and account:
+            try:
+                ok = bool(Buy_Stock(account, password, sid, 1, pb))
+                resp = "OK" if ok else "REJECTED"
+            except Exception as e:
+                ok, resp = False, f"ERR:{e}"
+        else:
+            ok, resp = True, "PAPER"
+        log.append({"sid": sid, "action": "BUY", "lots": 1, "shares": 1000,
+                    "price": pb, "weight": 0.0, "resp": resp, "ok": ok, "pad": True})
+        if ok:
+            state["cash_balance"] -= gross + fee
+            state["inventory"][sid] = state["inventory"].get(sid, 0) + 1000
+    print(f"  pad: {len(log)} round-trip orders ({sum(1 for e in log if e['ok'])} ok),"
+          f" cash now {state['cash_balance']:,.0f}")
     return log
 
 
