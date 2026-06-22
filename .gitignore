@@ -228,3 +228,6 @@ backtest_performance.xlsx
 docs/report/*.aux
 docs/report/*.log
 docs/report/*.out
+docs/report/*.xdv
+docs/report/*.fls
+docs/report/*.fdb_latexmk
