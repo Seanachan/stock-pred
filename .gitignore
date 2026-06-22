@@ -223,3 +223,11 @@ backtest_performance.xlsx
 # Allow deploy model artifacts (needed by GitHub Actions)
 !models/*.pkl
 !models/*.zip
+
+# LaTeX build artifacts
+docs/report/*.aux
+docs/report/*.log
+docs/report/*.out
+docs/report/*.xdv
+docs/report/*.fls
+docs/report/*.fdb_latexmk
