@@ -1,14 +1,14 @@
 {
-  "day_count": 3,
+  "day_count": 4,
   "initial_cash": 100000000,
-  "cash_balance": 7069843.527500009,
+  "cash_balance": 7066278.040000016,
   "inventory": {
     "2330": 0,
     "2317": 0,
     "2454": 1000,
     "2308": 0,
     "2382": 0,
-    "2303": 0,
+    "2303": 43000,
     "5347": 0,
     "8046": 8000,
     "2474": 0,
@@ -18,7 +18,7 @@
     "3008": 0,
     "3045": 0,
     "4904": 69000,
-    "2412": 51000,
+    "2412": 0,
     "8454": 0,
     "2881": 0,
     "2882": 0,
@@ -51,7 +51,7 @@
     "3231": 0,
     "3711": 0,
     "2383": 1000,
-    "2327": 0,
+    "2327": 7000,
     "3037": 7000,
     "2345": 0,
     "2360": 3000,
@@ -64,7 +64,7 @@
     "2449": 0,
     "2344": 0,
     "2301": 0,
-    "2408": 14000,
+    "2408": 16000,
     "3661": 0,
     "2059": 0,
     "2395": 0,
@@ -86,7 +86,7 @@
     "1476": 0,
     "2105": 0,
     "2377": 0,
-    "6285": 27000,
+    "6285": 0,
     "5269": 0,
     "2633": 0,
     "2610": 0,
@@ -946,6 +946,400 @@
       "port_val_before": 74777997.19000001,
       "port_val_after": 73619343.5275,
       "drawdown": 0.0003602829848846129
+    },
+    {
+      "date": "2026-06-23",
+      "actions": [
+        {
+          "sid": "2454",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 4535.0,
+          "weight": 0.09999999999220002,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2303",
+          "action": "BUY",
+          "lots": 43,
+          "shares": 43000,
+          "price": 170.0,
+          "weight": 0.09999999999220002,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "8046",
+          "action": "BUY",
+          "lots": 8,
+          "shares": 8000,
+          "price": 909.0,
+          "weight": 0.09999999999220002,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "4904",
+          "action": "BUY",
+          "lots": 69,
+          "shares": 69000,
+          "price": 107.0,
+          "weight": 0.09999999999220002,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2383",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 5700.0,
+          "weight": 0.09999999999220002,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2327",
+          "action": "BUY",
+          "lots": 7,
+          "shares": 7000,
+          "price": 1020.0,
+          "weight": 0.09954953808900342,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "3037",
+          "action": "BUY",
+          "lots": 7,
+          "shares": 7000,
+          "price": 974.0,
+          "weight": 0.09999999999220002,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2360",
+          "action": "BUY",
+          "lots": 3,
+          "shares": 3000,
+          "price": 2265.0,
+          "weight": 0.09999999999220002,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "3017",
+          "action": "BUY",
+          "lots": 3,
+          "shares": 3000,
+          "price": 2425.0,
+          "weight": 0.09999999999220002,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "2408",
+          "action": "BUY",
+          "lots": 16,
+          "shares": 16000,
+          "price": 454.5,
+          "weight": 0.09999999999220002,
+          "resp": "OK",
+          "ok": true
+        },
+        {
+          "sid": "4904",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 107.0,
+          "weight": 0.0,
+          "resp": "OK",
+          "ok": true,
+          "pad": true
+        },
+        {
+          "sid": "2303",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 170.0,
+          "weight": 0.0,
+          "resp": "OK",
+          "ok": true,
+          "pad": true
+        },
+        {
+          "sid": "2408",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 454.5,
+          "weight": 0.0,
+          "resp": "REJECTED",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "8046",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 909.0,
+          "weight": 0.0,
+          "resp": "REJECTED",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "3037",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 974.0,
+          "weight": 0.0,
+          "resp": "REJECTED",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2327",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 1020.0,
+          "weight": 0.0,
+          "resp": "REJECTED",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2360",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 2265.0,
+          "weight": 0.0,
+          "resp": "REJECTED",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "3017",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 2425.0,
+          "weight": 0.0,
+          "resp": "OK",
+          "ok": true,
+          "pad": true
+        },
+        {
+          "sid": "2454",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 4535.0,
+          "weight": 0.0,
+          "resp": "OK",
+          "ok": true,
+          "pad": true
+        },
+        {
+          "sid": "2383",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 5700.0,
+          "weight": 0.0,
+          "resp": "REJECTED",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "4904",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 107.0,
+          "weight": 0.0,
+          "resp": "OK",
+          "ok": true,
+          "pad": true
+        },
+        {
+          "sid": "2303",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 170.0,
+          "weight": 0.0,
+          "resp": "OK",
+          "ok": true,
+          "pad": true
+        },
+        {
+          "sid": "2408",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 454.5,
+          "weight": 0.0,
+          "resp": "REJECTED",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "8046",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 909.0,
+          "weight": 0.0,
+          "resp": "REJECTED",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "3037",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 974.0,
+          "weight": 0.0,
+          "resp": "REJECTED",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2327",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 1020.0,
+          "weight": 0.0,
+          "resp": "REJECTED",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2360",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 2265.0,
+          "weight": 0.0,
+          "resp": "REJECTED",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "3017",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 2425.0,
+          "weight": 0.0,
+          "resp": "OK",
+          "ok": true,
+          "pad": true
+        },
+        {
+          "sid": "2383",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 5700.0,
+          "weight": 0.0,
+          "resp": "REJECTED",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "4904",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 107.0,
+          "weight": 0.0,
+          "resp": "OK",
+          "ok": true,
+          "pad": true
+        },
+        {
+          "sid": "2303",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 170.0,
+          "weight": 0.0,
+          "resp": "OK",
+          "ok": true,
+          "pad": true
+        },
+        {
+          "sid": "3017",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 2425.0,
+          "weight": 0.0,
+          "resp": "OK",
+          "ok": true,
+          "pad": true
+        },
+        {
+          "sid": "2454",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 4535.0,
+          "weight": 0.0,
+          "resp": "OK",
+          "ok": true,
+          "pad": true
+        },
+        {
+          "sid": "4904",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 107.0,
+          "weight": 0.0,
+          "resp": "OK",
+          "ok": true,
+          "pad": true
+        },
+        {
+          "sid": "2303",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 170.0,
+          "weight": 0.0,
+          "resp": "OK",
+          "ok": true,
+          "pad": true
+        },
+        {
+          "sid": "3017",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 2425.0,
+          "weight": 0.0,
+          "resp": "OK",
+          "ok": true,
+          "pad": true
+        }
+      ],
+      "port_val_before": 74720608.69000001,
+      "port_val_after": 74566278.04000002,
+      "drawdown": 0.001127458170844176
     }
   ],
   "pending_fills": [
@@ -953,145 +1347,145 @@
       "sid": "2454",
       "action": "BUY",
       "shares": 1000,
-      "price": 4465.0
+      "price": 4535.0
+    },
+    {
+      "sid": "2303",
+      "action": "BUY",
+      "shares": 43000,
+      "price": 170.0
     },
     {
       "sid": "8046",
       "action": "BUY",
       "shares": 8000,
-      "price": 864.0
+      "price": 909.0
     },
     {
       "sid": "4904",
       "action": "BUY",
       "shares": 69000,
-      "price": 108.0
-    },
-    {
-      "sid": "2412",
-      "action": "BUY",
-      "shares": 51000,
-      "price": 144.5
+      "price": 107.0
     },
     {
       "sid": "2383",
       "action": "BUY",
       "shares": 1000,
-      "price": 5825.0
+      "price": 5700.0
+    },
+    {
+      "sid": "2327",
+      "action": "BUY",
+      "shares": 7000,
+      "price": 1020.0
     },
     {
       "sid": "3037",
       "action": "BUY",
       "shares": 7000,
-      "price": 1005.0
+      "price": 974.0
     },
     {
       "sid": "2360",
       "action": "BUY",
       "shares": 3000,
-      "price": 2310.0
+      "price": 2265.0
     },
     {
       "sid": "3017",
       "action": "BUY",
       "shares": 3000,
-      "price": 2420.0
+      "price": 2425.0
     },
     {
       "sid": "2408",
       "action": "BUY",
-      "shares": 14000,
-      "price": 505.0
-    },
-    {
-      "sid": "6285",
-      "action": "BUY",
-      "shares": 27000,
-      "price": 268.0
+      "shares": 16000,
+      "price": 454.5
     },
     {
       "sid": "4904",
       "action": "SELL",
       "shares": 1000,
-      "price": 108.0
+      "price": 107.0
     },
     {
-      "sid": "2412",
+      "sid": "2303",
       "action": "SELL",
       "shares": 1000,
-      "price": 144.5
+      "price": 170.0
     },
     {
       "sid": "3017",
       "action": "SELL",
       "shares": 1000,
-      "price": 2420.0
+      "price": 2425.0
     },
     {
       "sid": "2454",
       "action": "SELL",
       "shares": 1000,
-      "price": 4465.0
+      "price": 4535.0
     },
     {
       "sid": "4904",
       "action": "SELL",
       "shares": 1000,
-      "price": 108.0
+      "price": 107.0
     },
     {
-      "sid": "2412",
+      "sid": "2303",
       "action": "SELL",
       "shares": 1000,
-      "price": 144.5
+      "price": 170.0
     },
     {
       "sid": "3017",
       "action": "SELL",
       "shares": 1000,
-      "price": 2420.0
+      "price": 2425.0
     },
     {
       "sid": "4904",
       "action": "BUY",
       "shares": 1000,
-      "price": 108.0
+      "price": 107.0
     },
     {
-      "sid": "2412",
+      "sid": "2303",
       "action": "BUY",
       "shares": 1000,
-      "price": 144.5
+      "price": 170.0
     },
     {
       "sid": "3017",
       "action": "BUY",
       "shares": 1000,
-      "price": 2420.0
+      "price": 2425.0
     },
     {
       "sid": "2454",
       "action": "BUY",
       "shares": 1000,
-      "price": 4465.0
+      "price": 4535.0
     },
     {
       "sid": "4904",
       "action": "BUY",
       "shares": 1000,
-      "price": 108.0
+      "price": 107.0
     },
     {
-      "sid": "2412",
+      "sid": "2303",
       "action": "BUY",
       "shares": 1000,
-      "price": 144.5
+      "price": 170.0
     },
     {
       "sid": "3017",
       "action": "BUY",
       "shares": 1000,
-      "price": 2420.0
+      "price": 2425.0
     }
   ]
 }
