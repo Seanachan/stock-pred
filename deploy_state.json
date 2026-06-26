@@ -1,5 +1,5 @@
 {
-  "day_count": 6,
+  "day_count": 7,
   "initial_cash": 100000000,
   "cash_balance": 13547832.17250001,
   "inventory": {
@@ -2161,140 +2161,275 @@
       "port_val_before": 74619144.53500001,
       "port_val_after": 72924832.17250001,
       "drawdown": 0.0024838411043649313
+    },
+    {
+      "date": "2026-06-25",
+      "actions": [
+        {
+          "sid": "2308",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 1810.0,
+          "weight": 0.09999999999220004,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false
+        },
+        {
+          "sid": "2327",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 1015.0,
+          "weight": 0.09999999999220004,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false
+        },
+        {
+          "sid": "3017",
+          "action": "BUY",
+          "lots": 1,
+          "shares": 1000,
+          "price": 2255.0,
+          "weight": 0.09999999999220004,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false
+        },
+        {
+          "sid": "2344",
+          "action": "BUY",
+          "lots": 3,
+          "shares": 3000,
+          "price": 206.5,
+          "weight": 0.09999999999220004,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false
+        },
+        {
+          "sid": "2344",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 206.5,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "3037",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 975.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2327",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 1015.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2368",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 1190.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2308",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 1810.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2360",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 2035.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "3017",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 2255.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2454",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 3880.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "3443",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 4420.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2383",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 5255.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2344",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 206.5,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "3037",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 975.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2327",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 1015.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2368",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 1190.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2308",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 1810.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2360",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 2035.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "3017",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 2255.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2454",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 3880.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "3443",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 4420.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        },
+        {
+          "sid": "2383",
+          "action": "SELL",
+          "lots": 1,
+          "shares": 1000,
+          "price": 5255.0,
+          "weight": 0.0,
+          "resp": "ERR:Expecting value: line 1 column 1 (char 0)",
+          "ok": false,
+          "pad": true
+        }
+      ],
+      "port_val_before": 74426332.17250001,
+      "port_val_after": 74426332.17250001,
+      "drawdown": 0.005061375977314005
     }
   ],
-  "pending_fills": [
-    {
-      "sid": "2454",
-      "action": "BUY",
-      "shares": 1000,
-      "price": 4310.0
-    },
-    {
-      "sid": "2308",
-      "action": "BUY",
-      "shares": 3000,
-      "price": 1980.0
-    },
-    {
-      "sid": "2383",
-      "action": "BUY",
-      "shares": 1000,
-      "price": 5640.0
-    },
-    {
-      "sid": "2327",
-      "action": "BUY",
-      "shares": 6000,
-      "price": 1125.0
-    },
-    {
-      "sid": "3037",
-      "action": "BUY",
-      "shares": 7000,
-      "price": 1020.0
-    },
-    {
-      "sid": "2360",
-      "action": "BUY",
-      "shares": 3000,
-      "price": 2185.0
-    },
-    {
-      "sid": "3017",
-      "action": "BUY",
-      "shares": 2000,
-      "price": 2505.0
-    },
-    {
-      "sid": "2368",
-      "action": "BUY",
-      "shares": 6000,
-      "price": 1240.0
-    },
-    {
-      "sid": "2344",
-      "action": "BUY",
-      "shares": 33000,
-      "price": 219.5
-    },
-    {
-      "sid": "3443",
-      "action": "BUY",
-      "shares": 1000,
-      "price": 4850.0
-    },
-    {
-      "sid": "2308",
-      "action": "SELL",
-      "shares": 1000,
-      "price": 1980.0
-    },
-    {
-      "sid": "3017",
-      "action": "SELL",
-      "shares": 1000,
-      "price": 2505.0
-    },
-    {
-      "sid": "2454",
-      "action": "SELL",
-      "shares": 1000,
-      "price": 4310.0
-    },
-    {
-      "sid": "3443",
-      "action": "SELL",
-      "shares": 1000,
-      "price": 4850.0
-    },
-    {
-      "sid": "2308",
-      "action": "SELL",
-      "shares": 1000,
-      "price": 1980.0
-    },
-    {
-      "sid": "3017",
-      "action": "SELL",
-      "shares": 1000,
-      "price": 2505.0
-    },
-    {
-      "sid": "2308",
-      "action": "BUY",
-      "shares": 1000,
-      "price": 1980.0
-    },
-    {
-      "sid": "3017",
-      "action": "BUY",
-      "shares": 1000,
-      "price": 2505.0
-    },
-    {
-      "sid": "2454",
-      "action": "BUY",
-      "shares": 1000,
-      "price": 4310.0
-    },
-    {
-      "sid": "3443",
-      "action": "BUY",
-      "shares": 1000,
-      "price": 4850.0
-    },
-    {
-      "sid": "2308",
-      "action": "BUY",
-      "shares": 1000,
-      "price": 1980.0
-    },
-    {
-      "sid": "3017",
-      "action": "BUY",
-      "shares": 1000,
-      "price": 2505.0
-    }
-  ]
+  "pending_fills": []
 }
