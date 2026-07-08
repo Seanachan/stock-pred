@@ -9,3 +9,4 @@ Branch: v6-universe | Source ledger: `main:deploy_state.json` | Initial cash: 10
 | 2026-06-24 | 5 | 74,532,792 | -25.47% | 0.002 | 9 | 18.7% | false | 21 BUY 20 SELL |
 | 2026-06-25 | 7 | 74,426,332 | -25.57% | 0.506 | 10 | 18.2% | false | 0/24 ALL FAILED (API ERR) |
 | 2026-06-29 | 8 | 13,547,832 | -86.45% | 0.819 | 0 | 100.0% | **TRUE** | 0 (HALT — liquidated) |
+| 2026-07-08 | 8 | 13,547,832 | -86.45% | 0.819 | 0 | 100.0% | **TRUE** | 0 (watch check — still halted, 9 days, no manual intervention) |
