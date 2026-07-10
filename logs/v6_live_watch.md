@@ -11,3 +11,4 @@ Branch: v6-universe | Source ledger: `main:deploy_state.json` | Initial cash: 10
 | 2026-06-29 | 8 | 13,547,832 | -86.45% | 0.819 | 0 | 100.0% | **TRUE** | 0 (HALT — liquidated) |
 | 2026-07-08 | 8 | 13,547,832 | -86.45% | 0.819 | 0 | 100.0% | **TRUE** | 0 (watch check — still halted, 9 days, no manual intervention) |
 | 2026-07-09 | 8 | 13,547,832 | -86.45% | 0.819 | 0 | 100.0% | **TRUE** | 0 (watch check — still halted, 10 days; retrain committed today but deploy still frozen; daily deploy workflow may not be running) |
+| 2026-07-10 | 8 | 13,547,832 | -86.45% | 0.819 | 0 | 100.0% | **TRUE** | 0 (watch check — still halted, 11 days; no state change since Jun 29 liquidation; manual un-halt required) |
